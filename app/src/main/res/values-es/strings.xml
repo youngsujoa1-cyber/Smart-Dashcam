@@ -46,6 +46,8 @@
     <string name="settings_title">Ajustes de grabación</string>
     <string name="settings_language_title">Idioma de la app</string>
     <string name="settings_language_note">El idioma elegido se aplica al instante en toda la app.</string>
+    <string name="language_select_title">Elige tu idioma</string>
+    <string name="language_select_message">Elige el idioma que quieres usar. Puedes cambiarlo cuando quieras en Ajustes.</string>
     <string name="language_system">Sistema (idioma del dispositivo)</string>
     <string name="settings_segment_title">Duración del segmento</string>
     <string name="settings_segment_1min">1 min</string>

@@ -47,6 +47,14 @@ class AppSettings(context: Context) {
         get() = prefs.getString(KEY_LANGUAGE_TAG, "") ?: ""
         set(value) = prefs.edit { putString(KEY_LANGUAGE_TAG, value) }
 
+    /**
+     * False until the user has answered the first-launch language screen (or dismissed it),
+     * so that screen is shown exactly once per install and never on later launches.
+     */
+    var hasSelectedLanguage: Boolean
+        get() = prefs.getBoolean(KEY_HAS_SELECTED_LANGUAGE, false)
+        set(value) = prefs.edit { putBoolean(KEY_HAS_SELECTED_LANGUAGE, value) }
+
     // ---- derived ----------------------------------------------------------
 
     val segmentMillis: Long
@@ -68,6 +76,7 @@ class AppSettings(context: Context) {
         private const val KEY_RECORD_AUDIO = "record_audio"
         private const val KEY_SHOW_SPEED = "show_speed"
         private const val KEY_LANGUAGE_TAG = "language_tag"
+        private const val KEY_HAS_SELECTED_LANGUAGE = "has_selected_language"
 
         const val DEFAULT_SEGMENT_MINUTES = 3
         const val DEFAULT_STORAGE_LIMIT_GB = 2

@@ -46,6 +46,8 @@
     <string name="settings_title">录像设置</string>
     <string name="settings_language_title">应用语言</string>
     <string name="settings_language_note">所选语言会立即应用到整个应用。</string>
+    <string name="language_select_title">选择语言</string>
+    <string name="language_select_message">请选择要使用的语言。之后可以随时在设置中更改。</string>
     <string name="language_system">系统设置（设备语言）</string>
     <string name="settings_segment_title">录像分段长度</string>
     <string name="settings_segment_1min">1 分钟</string>

@@ -44,6 +44,9 @@ Gradle Kotlin DSL 프로젝트로 바로 빌드할 수 있는 상태입니다.
 - `configChanges` 로 회전을 직접 처리하므로 Activity 가 재생성되지 않고, 미리보기와 녹화가 끊기지 않습니다.
 - 현재 화면 방향은 서비스에 전달되어 **새로 시작하는 구간의 영상 방향**에 반영됩니다.
   (이미 녹화 중인 구간은 시작할 때의 방향을 유지합니다.)
+- **가로 화면에서 녹화 중일 때는 하단 광고 배너를 자동으로 숨깁니다.** 배너가 미리보기와 조작 버튼을
+  가리지 않도록, 세로로 돌리거나 녹화를 멈추면 다시 나타납니다(`MainActivity.updateAdBanner()`,
+  `onConfigurationChanged` 에서 즉시 반영).
 
 ### 1.4 블랙박스 루프 녹화
 - 녹화를 **구간(1분 / 3분 / 5분)** 으로 쪼개 저장하고, 구간이 끝나면 자동으로 다음 구간을 이어서 녹화합니다.
@@ -70,6 +73,9 @@ Gradle Kotlin DSL 프로젝트로 바로 빌드할 수 있는 상태입니다.
 - `설정 → 앱 언어` 에서 **시스템 설정 / 한국어 / English / 日本語 / 中文 / Español** 중 선택할 수 있습니다.
 - 선택은 `SharedPreferences`(`AppSettings.languageTag`)에 저장되고,
   **`AppCompatDelegate.setApplicationLocales()`** 로 앱 전체(화면·다이얼로그·토스트·상시 알림)에 즉시 적용됩니다.
+- **처음 설치 후 첫 실행 때 언어 선택 화면이 한 번 뜹니다.** `한국어 / English / 日本語 / 中文 / Español /
+  시스템 설정` 중 하나를 누르면 곧바로 그 언어로 앱이 바뀌고, 선택은 저장되어 다시 묻지 않습니다
+  (`AppSettings.hasSelectedLanguage`). 이후에는 `설정 → 앱 언어` 에서 언제든 바꿀 수 있습니다.
 - 문자열은 `res/values/strings.xml`(한국어 기본) 과 `values-en`, `values-ja`, `values-zh`, `values-es` 에 있습니다.
 - 언어 이름은 각 언어 표기 그대로 두어, 지금 화면 언어를 몰라도 찾을 수 있게 했습니다.
 
@@ -82,6 +88,7 @@ Gradle Kotlin DSL 프로젝트로 바로 빌드할 수 있는 상태입니다.
 - 배너: **메인 화면 하단**, **갤러리 화면 하단** (앵커드 적응형 배너)
 - 전면광고: **녹화 정지 직후**, **설정/갤러리 열기 전** — 3분 쿨다운(`AdConfig.INTERSTITIAL_COOLDOWN_MS`).
   설정·갤러리를 열어도 녹화는 백그라운드에서 계속되므로 광고가 녹화를 끊지 않습니다.
+- **가로 화면에서 녹화 중에는 메인 배너를 숨깁니다**(광고 갱신도 일시정지). 세로 복귀 또는 녹화 정지 시 다시 표시됩니다.
 - 실제 ID로 바꾸는 위치는 **3장**에 정리되어 있고, 코드에는 `TODO(AdMob)` 주석이 달려 있습니다.
 
 ### 1.10 GitHub Actions 자동 APK 빌드
@@ -166,7 +173,7 @@ MobileAds.setRequestConfiguration(
    ```
    `*.jks` 는 `.gitignore` 로 커밋되지 않습니다. 분실하면 업데이트가 불가능합니다.
 2. **`app/build.gradle.kts` 의 release 서명 설정** (`TODO(PlayStore)` 부분) + `keystore.properties`(gitignore 대상)
-3. `versionCode` / `versionName` 증가 (현재 2 / 1.1.0)
+3. `versionCode` / `versionName` 증가 (현재 3 / 1.1.1)
 4. **AAB 빌드** → `./gradlew bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`
 5. **Play Console**
    - 앱 콘텐츠: 카메라·마이크·위치·알림 권한 사용 목적 설명

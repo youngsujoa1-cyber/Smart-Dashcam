@@ -46,6 +46,8 @@
     <string name="settings_title">録画設定</string>
     <string name="settings_language_title">アプリの言語</string>
     <string name="settings_language_note">選択した言語はアプリ全体にすぐ反映されます。</string>
+    <string name="language_select_title">言語を選択</string>
+    <string name="language_select_message">アプリで使う言語を選んでください。あとから設定でいつでも変更できます。</string>
     <string name="language_system">システム設定（端末の言語）</string>
     <string name="settings_segment_title">録画区間の長さ</string>
     <string name="settings_segment_1min">1分</string>

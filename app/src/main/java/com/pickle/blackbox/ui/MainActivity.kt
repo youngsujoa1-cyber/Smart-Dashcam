@@ -12,20 +12,26 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.view.Gravity
 import android.view.Surface
 import android.widget.ArrayAdapter
+import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.Preview
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
+import com.google.android.gms.ads.AdView
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.pickle.blackbox.BlackboxApp
 import com.pickle.blackbox.R
 import com.pickle.blackbox.ads.AdManager
 import com.pickle.blackbox.databinding.ActivityMainBinding
+import com.pickle.blackbox.databinding.DialogLanguageBinding
 import com.pickle.blackbox.databinding.DialogSettingsBinding
 import com.pickle.blackbox.media.Clip
 import com.pickle.blackbox.media.ClipStorage
@@ -56,6 +62,13 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
     private var lastSpeedKmh = -1f
     private var isRecordingUi = false
     private var showAdAfterStop = false
+
+    /** This screen's bottom banner; paused while the banner is hidden. */
+    private var bannerAdView: AdView? = null
+    private var bannerHidden = false
+
+    /** Open first-launch language dialog, if any (kept so a choice can close it). */
+    private var languageDialog: AlertDialog? = null
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -94,13 +107,19 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
         setContentView(binding.root)
 
         wireUi()
-        adManager.createBanner(binding.adContainer)
+        bannerAdView = adManager.createBanner(binding.adContainer)
         adManager.preloadInterstitial()
 
         binding.tvSegment.text = getString(R.string.hud_segment_format, settings.segmentMinutes)
         binding.tvDateTime.text = Formatters.nowDateTime()
-        ensurePermissions()
+        if (settings.hasSelectedLanguage) {
+            ensurePermissions()
+        } else {
+            // First launch: choose the language first, then ask for permissions.
+            showLanguagePicker()
+        }
         updateStorageInfo()
+        updateAdBanner()
     }
 
     private fun wireUi() {
@@ -291,6 +310,66 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
             ContextCompat.getColor(this, if (recording) R.color.bb_primary else R.color.bb_text_dim)
         )
         binding.tvSegment.text = getString(R.string.hud_segment_format, settings.segmentMinutes)
+        updateAdBanner()
+    }
+
+    // ------------------------------------------------- first-launch language
+
+    /**
+     * Shown once per install: the user picks the app language right away instead of
+     * having to find Settings first. Every row is a full-width, 56dp tall button so it is
+     * easy to tap.
+     */
+    private fun showLanguagePicker() {
+        val dialogBinding = DialogLanguageBinding.inflate(layoutInflater)
+        val density = resources.displayMetrics.density
+
+        AppLanguage.firstRunOptions(this).forEach { (tag, label) ->
+            val option = MaterialButton(
+                this,
+                null,
+                com.google.android.material.R.attr.materialButtonOutlinedStyle
+            ).apply {
+                text = label
+                isAllCaps = false
+                textSize = 16f
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                minHeight = (56 * density).toInt()
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = (8 * density).toInt() }
+                setOnClickListener { selectLanguage(tag) }
+            }
+            dialogBinding.languageList.addView(option)
+        }
+
+        languageDialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.language_select_title)
+            .setView(dialogBinding.root)
+            .setOnCancelListener {
+                // Back press: keep the device language, do not ask again, continue to permissions.
+                settings.languageTag = AppLanguage.SYSTEM
+                settings.hasSelectedLanguage = true
+                ensurePermissions()
+            }
+            .create()
+            .also { it.show() }
+    }
+
+    private fun selectLanguage(tag: String) {
+        settings.languageTag = tag
+        settings.hasSelectedLanguage = true
+        languageDialog?.dismiss()
+        languageDialog = null
+        // Applies to every screen / dialog / toast / the recording notification. When the
+        // locale actually changes this recreates the activity stack with the new language.
+        AppLanguage.apply(tag)
+        service?.refreshNotification()
+        // Choosing "system" keeps the current locale, so this screen survives and has to
+        // continue to the permission step itself; any real language change recreates the
+        // activity, whose onCreate asks for permissions.
+        if (tag == AppLanguage.SYSTEM) ensurePermissions()
     }
 
     // ---------------------------------------------------------------- actions
@@ -478,6 +557,25 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
         super.onConfigurationChanged(newConfig)
         // The screen was rotated: keep the preview and the next recorded segment in step.
         applyRotationToService()
+        // Rotating in or out of landscape while recording shows/hides the banner right away.
+        updateAdBanner()
+    }
+
+    // -------------------------------------------------------------------- ads
+
+    private val isLandscape: Boolean
+        get() = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    /**
+     * In landscape the banner would sit over the camera preview and the controls, so it is
+     * hidden while recording. It comes back when recording stops or the screen turns upright.
+     */
+    private fun updateAdBanner() {
+        val hide = isRecordingUi && isLandscape
+        if (hide == bannerHidden) return
+        bannerHidden = hide
+        binding.adContainer.isVisible = !hide
+        if (hide) bannerAdView?.pause() else bannerAdView?.resume()
     }
 
     private fun applyRotationToService() {

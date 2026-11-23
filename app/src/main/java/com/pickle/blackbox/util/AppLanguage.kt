@@ -30,6 +30,14 @@ object AppLanguage {
         "es" to "Español"
     )
 
+    /**
+     * Options for the first-launch screen: the five bundled languages first, then
+     * "follow the system language" at the end. (The settings spinner keeps system first.)
+     */
+    fun firstRunOptions(context: Context): List<Pair<String, String>> =
+        options(context).filter { it.first != SYSTEM } +
+            (SYSTEM to context.getString(R.string.language_system))
+
     /** Applies [tag] to the whole app ("" = system default). */
     fun apply(tag: String) {
         val locales = if (tag.isBlank()) {

@@ -37,9 +37,15 @@ class AdManager(private val context: Context) {
         }
     }
 
-    /** Attaches a fresh banner to [container]. Safe to call more than once. */
-    fun createBanner(container: ViewGroup) {
-        if (!AdConfig.ADS_ENABLED) return
+    /**
+     * Attaches a fresh banner to [container] and returns it. Safe to call more than once.
+     *
+     * The AdView is returned so a screen can keep it and pause/resume it on its own
+     * (e.g. hiding the banner while recording in landscape); [AdManager] is shared by all
+     * screens, so it does not remember any single screen's banner.
+     */
+    fun createBanner(container: ViewGroup): AdView? {
+        if (!AdConfig.ADS_ENABLED) return null
         initialize()
         container.removeAllViews()
 
@@ -59,6 +65,7 @@ class AdManager(private val context: Context) {
         }
         container.addView(adView)
         adView.loadAd(AdRequest.Builder().build())
+        return adView
     }
 
     fun preloadInterstitial() {
