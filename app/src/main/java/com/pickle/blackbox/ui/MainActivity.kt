@@ -14,6 +14,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.view.Gravity
 import android.view.Surface
+import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
 import android.widget.SeekBar
@@ -23,7 +24,12 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.Preview
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import com.google.android.gms.ads.AdView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -47,6 +53,11 @@ import java.util.Locale
  *
  * The camera and the recording itself live in [RecordingService]; this screen only
  * drives it and shows its state, so leaving the app never interrupts a recording.
+ *
+ * System bars: the screen draws edge-to-edge (Android 15 enforces this for targetSdk 35,
+ * which is why the 3-button navigation bar used to sit permanently on top of the bottom
+ * banner) and the navigation bar is put into immersive sticky mode, so the `||| ○ <`
+ * buttons only slide in while the user swipes up from the bottom edge.
  */
 class MainActivity : AppCompatActivity(), RecordingService.UiListener {
 
@@ -69,6 +80,10 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
 
     /** Open first-launch language dialog, if any (kept so a choice can close it). */
     private var languageDialog: AlertDialog? = null
+
+    /** Layout offsets below are kept away from the system bars by this much. */
+    private val hudBaseTopMarginDp = 12
+    private val bannerMinBottomGapDp = 8
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -96,6 +111,9 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Must run before the content view is attached: the preview fills the screen
+        // behind the status bar, and the navigation bar starts hidden.
+        applyImmersiveNavigation()
         app = applicationContext as BlackboxApp
         settings = app.settings
         clipStorage = app.clipStorage
@@ -105,6 +123,7 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applySystemBarInsets()
 
         wireUi()
         bannerAdView = adManager.createBanner(binding.adContainer)
@@ -149,6 +168,66 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
         }
 
         binding.btnPermissionRetry.setOnClickListener { ensurePermissions() }
+    }
+
+    // ------------------------------------------------------------ system bars
+
+    /**
+     * Edge-to-edge plus immersive sticky navigation bar: the bottom `||| ○ <` bar is hidden
+     * and only shows itself (transiently, over the content) when the user swipes up from the
+     * bottom edge. The status bar stays visible so the HUD has a normal clock/battery row.
+     */
+    private fun applyImmersiveNavigation() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        hideNavigationBar()
+    }
+
+    private fun hideNavigationBar() {
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.navigationBars())
+        }
+    }
+
+    /**
+     * Keeps the HUD below the status bar / display cutout and the banner above the bottom
+     * edge. The banner also gets a small gap while the navigation bar is hidden so it is not
+     * clipped by the screen's rounded corners; while the bar is swiped in, the gap grows to
+     * its height so the transient bar covers the empty strip, not the ad.
+     *
+     * The gap is a margin, not padding: padding would shrink the child area by a few dp and
+     * the banner (sized from the full screen width) would be clipped on the right edge.
+     */
+    private fun applySystemBarInsets() {
+        val density = resources.displayMetrics.density
+        val hudBaseTopMargin = (hudBaseTopMarginDp * density).toInt()
+        val bannerMinBottomGap = (bannerMinBottomGapDp * density).toInt()
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or
+                    WindowInsetsCompat.Type.displayCutout()
+            )
+            binding.hudPanel.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                topMargin = hudBaseTopMargin + bars.top
+            }
+            binding.adContainer.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                bottomMargin = maxOf(bars.bottom, bannerMinBottomGap)
+            }
+            // Nothing consumed: dialogs and the preview keep the full window insets.
+            insets
+        }
+        ViewCompat.requestApplyInsets(binding.root)
+    }
+
+    /**
+     * A dialog, a rotation or a system gesture can bring the navigation bar back; hide it
+     * again as soon as this screen owns the focus.
+     */
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideNavigationBar()
     }
 
     // ------------------------------------------------------------ permissions
@@ -555,6 +634,10 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        // Rotation re-creates the window insets; re-assert the hidden navigation bar and
+        // let the inset listener place the HUD / banner for the new orientation.
+        hideNavigationBar()
+        ViewCompat.requestApplyInsets(binding.root)
         // The screen was rotated: keep the preview and the next recorded segment in step.
         applyRotationToService()
         // Rotating in or out of landscape while recording shows/hides the banner right away.
