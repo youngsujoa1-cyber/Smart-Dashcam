@@ -10,6 +10,7 @@ import android.view.Surface
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.core.SurfaceRequest
+import androidx.camera.core.UseCaseGroup
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.Quality
@@ -39,6 +40,11 @@ import java.util.concurrent.Executor
  * back as a frozen image. [setPreviewSurfaceProvider] therefore swaps in a tiny
  * offscreen [SurfaceTexture] instead of clearing the provider, and swaps the UI surface
  * back as its consumer when the screen returns.
+ *
+ * The video use case is bound inside a [UseCaseGroup] together with a
+ * [TimestampWatermarkEffect], so the date and time are burned into the saved footage. The
+ * effect only targets `VIDEO_CAPTURE`: the preview stream stays untouched. If a device
+ * refuses the effect, the bind is retried once without it so the camera keeps working.
  */
 class CameraController(
     private val context: Context,
@@ -54,6 +60,10 @@ class CameraController(
     private var cameraProvider: ProcessCameraProvider? = null
     private var preview: Preview? = null
     private var videoCapture: VideoCapture<Recorder>? = null
+
+    /** Burns the date and time into the recorded frames; null when the device refused it. */
+    private var timestampEffect: TimestampWatermarkEffect? = null
+    private var timestampEffectUsable = true
 
     /** The surface of the screen that is currently on top, null while no screen is attached. */
     private var uiSurfaceProvider: Preview.SurfaceProvider? = null
@@ -188,6 +198,8 @@ class CameraController(
         videoCapture = null
         boundRotation = -1
         dummyAttachedToPreview = false
+        timestampEffect?.close()
+        timestampEffect = null
     }
 
     private fun selectorFor(front: Boolean): CameraSelector =
@@ -231,7 +243,7 @@ class CameraController(
 
         try {
             provider.unbindAll()
-            provider.bindToLifecycle(lifecycleOwner, selector, previewUseCase, capture)
+            bindWithTimestampEffect(provider, selector, previewUseCase, capture)
             preview = previewUseCase
             videoCapture = capture
             boundRotation = targetRotation
@@ -244,6 +256,56 @@ class CameraController(
             boundRotation = -1
             onError?.invoke("카메라 화면을 표시할 수 없습니다: " + (t.message ?: "알 수 없는 오류"))
         }
+    }
+
+    /**
+     * Binds preview + video with the timestamp effect attached to the video stream.
+     *
+     * The effect has to live in a [UseCaseGroup] to reach the video pipeline. Should the effect
+     * itself fail to build (no usable EGL configuration) or the session refuse it, this falls
+     * back to a plain bind so a camera without a timestamp is always better than no camera.
+     */
+    private fun bindWithTimestampEffect(
+        provider: ProcessCameraProvider,
+        selector: CameraSelector,
+        previewUseCase: Preview,
+        capture: VideoCapture<Recorder>
+    ) {
+        val effect = obtainTimestampEffect()
+        if (effect == null) {
+            provider.bindToLifecycle(lifecycleOwner, selector, previewUseCase, capture)
+            return
+        }
+        try {
+            provider.bindToLifecycle(
+                lifecycleOwner,
+                selector,
+                UseCaseGroup.Builder()
+                    .addUseCase(previewUseCase)
+                    .addUseCase(capture)
+                    .addEffect(effect)
+                    .build()
+            )
+        } catch (t: Throwable) {
+            Log.w(TAG, "Binding the timestamp effect failed; recording without a stamp", t)
+            timestampEffectUsable = false
+            timestampEffect?.close()
+            timestampEffect = null
+            runCatching { provider.unbindAll() }
+            provider.bindToLifecycle(lifecycleOwner, selector, previewUseCase, capture)
+        }
+    }
+
+    private fun obtainTimestampEffect(): TimestampWatermarkEffect? {
+        timestampEffect?.let { return it }
+        if (!timestampEffectUsable) return null
+        return runCatching { TimestampWatermarkEffect.create() }
+            .onFailure { Log.e(TAG, "Could not create the timestamp effect", it) }
+            .getOrElse {
+                timestampEffectUsable = false
+                null
+            }
+            .also { timestampEffect = it }
     }
 
     // ------------------------------------------------------- offscreen preview

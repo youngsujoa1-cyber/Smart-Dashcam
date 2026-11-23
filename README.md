@@ -7,7 +7,7 @@ Gradle Kotlin DSL 프로젝트로 바로 빌드할 수 있는 상태입니다.
 | 항목 | 값 |
 | --- | --- |
 | 앱 이름 | RoadEyeCam (`com.pickle.blackbox`) |
-| 버전 | 1.2.7 (versionCode 11) |
+| 버전 | 1.2.8 (versionCode 12) |
 | 플랫폼 | Android (Kotlin) |
 | minSdk / targetSdk / compileSdk | 26 / 35 / 35 |
 | AGP / Gradle / Kotlin | 8.7.3 / 8.9 / 2.0.21 |
@@ -137,6 +137,25 @@ Gradle Kotlin DSL 프로젝트로 바로 빌드할 수 있는 상태입니다.
 - `main` 푸시 또는 Actions 탭의 **Run workflow** 로 실행됩니다.
 - 워크플로 파일은 저장소의 GitHub App 연결에 **Workflows 쓰기 권한**이 있어야 푸시할 수 있습니다.
 
+### 1.11 녹화 영상 날짜·시간 워터마크 (1.2.8)
+- **저장된 MP4 자체에 날짜·시간이 찍힙니다.** `yyyy-MM-dd HH:mm:ss`(예: `2026-11-24 05:33:38`)가
+  화면 아래쪽 왼쪽에 반투명 검정 배지 + 흰색 굵은 글씨로 들어가고, 갤러리·다른 앱·PC로 복사한
+  파일에서도 그대로 보입니다. 속도(km/h)는 넣지 않았습니다.
+- 구현은 Google `camera-effects` 라이브러리 없이 **직접 만든 EGL 2.0 / GLES20 `SurfaceProcessor`**
+  입니다(`camera/TimestampWatermark.kt`). `CameraEffect(VIDEO_CAPTURE)` 로 **비디오 스트림에만** 붙기
+  때문에 미리보기 화면은 그대로이고, 녹화 파이프라인에 한 번 더 그려 넣는 방식이라 별도 트랜스코딩이
+  없습니다.
+  - 카메라 프레임은 `SurfaceOutput.updateTransformMatrix()` 가 돌려주는 텍스처 행렬로 그립니다.
+    이 행렬에는 이 유스케이스의 **회전·미러링·크롭**이 모두 들어 있어서, 전면/후면 · 세로/가로
+    (`ROTATION_90`/`270`) 어디서든 영상이 바로 선 상태로 인코더에 들어갑니다.
+  - 날짜·시간은 그 위에 **축이 맞춰진 별도 사각형**으로 그리므로 영상이 회전해도 글자가 눕거나
+    뒤집히지 않고, 미러링되어도 좌우 반전되지 않습니다.
+  - 텍스트 비트맵은 **초가 바뀔 때만**(+프레임 크기가 바뀔 때) 다시 그리고 `glTexSubImage2D` 로
+    업로드합니다. 30fps 에서도 프레임당 비트맵/텍스처 할당이 없습니다.
+  - 서비스 종료·재바인딩(렌즈 전환, 회전) 시 `SurfaceTexture`·EGL 서피스·컨텍스트·GL 오브젝트·
+    GL 스레드를 순서대로 해제합니다(`TimestampWatermarkEffect.close()`).
+  - 기기가 효과를 거부하면(=바인드 예외) **효과 없이 다시 바인드**해서 카메라는 항상 살아 있게 합니다.
+
 ---
 
 ## 2. 빌드하고 실행하기
@@ -213,7 +232,7 @@ MobileAds.setRequestConfiguration(
    ```
    `*.jks` 는 `.gitignore` 로 커밋되지 않습니다. 분실하면 업데이트가 불가능합니다.
 2. **`app/build.gradle.kts` 의 release 서명 설정** (`TODO(PlayStore)` 부분) + `keystore.properties`(gitignore 대상)
-3. `versionCode` / `versionName` 증가 (현재 11 / 1.2.7)
+3. `versionCode` / `versionName` 증가 (현재 12 / 1.2.8)
 4. **AAB 빌드** → `./gradlew bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`
 5. **Play Console**
    - 앱 콘텐츠: 카메라·마이크·위치·알림 권한 사용 목적 설명
@@ -354,6 +373,8 @@ blackbox-app/
 | 녹화 중 폰을 돌렸는데 영상이 계속 세로 | 1.2.6 에서 디바운스 후 구간 마감 + 세션 재바인딩으로 수정. 설치된 APK 가 1.2.6(versionCode 10)인지 확인 |
 | 영상이 1~2초짜리로 계속 쪼개짐 | 1.2.7 에서 회전 디바운스를 4.5초로 늘리고, 가로 고정 모드에서는 방향으로 구간을 끊지 않도록 수정. 설치된 APK 가 1.2.7(versionCode 11)인지 확인 |
 | 세로로 시작했거나 백그라운드에서 세로로 저장 | 1.2.7 의 `녹화 방향 = 가로 고정` 을 켜세요. 백그라운드 회전은 1.2.7 에서 `DisplayManager.DisplayListener` 로 감지합니다 |
+| 영상에 날짜·시간이 안 보임 | 1.2.8(versionCode 12)인지 확인. `logcat` 에서 `TimestampWatermark` 태그의 `Output surface ready` / `EGL ready` / `Timestamp effect failed` 로그 확인. 효과가 바인드에 실패하면 앱이 효과 없이 다시 바인드하므로 녹화 자체는 정상입니다 |
+| 날짜·시간 글자가 눕거나 뒤집혀 보임 | 드물게 인코더 서피스 방향이 기대와 다를 때 생깁니다. `TimestampWatermarkProcessor.drawStamp()` 의 `STAMP_TEX_COORDS` / 사각형 좌표를 90° 회전한 값으로 바꾸면 됩니다 |
 | 앱 언어가 바뀌지 않음 | 설정 → 앱 언어에서 다시 선택(즉시 적용) |
 
 ---
