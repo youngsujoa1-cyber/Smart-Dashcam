@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">픽클 블랙박스</string>
+
+    <!-- Main screen HUD -->
+    <string name="hud_idle">대기 중</string>
+    <string name="hud_recording">REC</string>
+    <string name="hud_saving">저장 중…</string>
+    <string name="hud_timer_placeholder">00:00:00</string>
+    <string name="hud_lens_back">후면 카메라</string>
+    <string name="hud_lens_front">전면 카메라</string>
+    <string name="hud_speed_unknown">GPS 대기</string>
+    <string name="hud_speed_format">%1$d km/h</string>
+    <string name="hud_storage_format">저장 %1$s / %2$s</string>
+    <string name="hud_segment_format">구간 %1$d분</string>
+    <string name="hud_locked_badge">현재 클립 잠금</string>
+    <string name="hud_locked_next_badge">다음 클립부터 잠금</string>
+
+    <!-- Actions -->
+    <string name="action_start_recording">녹화 시작</string>
+    <string name="action_stop_recording">녹화 정지</string>
+    <string name="action_switch_camera">전면/후면 카메라 전환</string>
+    <string name="action_lock_clip">현재 클립 잠금</string>
+    <string name="action_open_gallery">녹화 목록</string>
+    <string name="action_settings">설정</string>
+    <string name="action_close">닫기</string>
+    <string name="action_save">저장</string>
+    <string name="action_cancel">취소</string>
+    <string name="action_delete">삭제</string>
+    <string name="action_play">재생</string>
+    <string name="action_lock">잠금</string>
+    <string name="action_unlock">잠금 해제</string>
+
+    <!-- Permission -->
+    <string name="permission_required">카메라와 마이크 권한을 허용해야 녹화할 수 있습니다.\n설정에서 권한을 켜거나 다시 시도해 주세요.</string>
+    <string name="permission_retry">권한 다시 요청</string>
+
+    <!-- Gallery -->
+    <string name="gallery_title">녹화 목록</string>
+    <string name="gallery_empty">저장된 영상이 없습니다.\n메인 화면에서 녹화를 시작해 보세요.</string>
+    <string name="gallery_summary_format">%1$d개 · %2$s</string>
+    <string name="gallery_summary_locked">잠금 %1$d개</string>
+    <string name="gallery_summary_loading">불러오는 중…</string>
+    <string name="gallery_meta_format">%1$s · %2$s · %3$s</string>
+    <string name="gallery_player_title">%1$s 재생</string>
+
+    <!-- Settings -->
+    <string name="settings_title">녹화 설정</string>
+    <string name="settings_segment_title">녹화 구간 길이</string>
+    <string name="settings_segment_1min">1분</string>
+    <string name="settings_segment_3min">3분</string>
+    <string name="settings_segment_5min">5분</string>
+    <string name="settings_storage_title">저장 용량 한도 (일반 영상)</string>
+    <string name="settings_storage_1gb">1GB</string>
+    <string name="settings_storage_2gb">2GB</string>
+    <string name="settings_storage_5gb">5GB</string>
+    <string name="settings_sensitivity_title">충격 감도 (오른쪽으로 갈수록 예민)</string>
+    <string name="settings_sensitivity_value">감도 %1$d / 5 · 기준 %2$s</string>
+    <string name="settings_auto_lock">충격 감지 시 자동 잠금</string>
+    <string name="settings_record_audio">소리 함께 녹음</string>
+    <string name="settings_show_speed">GPS 속도 표시</string>
+    <string name="settings_note">잠금된 영상은 용량 한도 정리에서 제외됩니다.\n설정은 다음 녹화 구간부터 적용됩니다.</string>
+
+    <!-- Toasts / dialogs -->
+    <string name="toast_switch_while_recording">녹화 중에는 카메라를 전환할 수 없습니다. 정지 후 전환해 주세요.</string>
+    <string name="toast_camera_unavailable">사용 가능한 카메라를 찾을 수 없습니다.</string>
+    <string name="toast_nothing_to_lock">잠글 영상이 없습니다.</string>
+    <string name="toast_lock_scheduled">현재 클립을 잠금 처리합니다.</string>
+    <string name="toast_unlock_forbidden">잠금 해제는 목록 화면에서 할 수 있습니다.</string>
+    <string name="toast_impact_detected">충격 감지(%1$s) — 현재 영상 잠금</string>
+    <string name="toast_impact_only">충격 감지(%1$s)</string>
+    <string name="toast_saved">저장됨: %1$s</string>
+    <string name="toast_saved_locked">잠금 영상 저장됨: %1$s</string>
+    <string name="toast_save_failed">영상 저장에 실패했습니다.</string>
+    <string name="toast_settings_saved">설정이 저장되었습니다.</string>
+    <string name="dialog_delete_title">영상을 삭제할까요?</string>
+    <string name="dialog_delete_message">%1$s\n삭제한 영상은 복구할 수 없습니다.</string>
+    <string name="toast_delete_done">삭제했습니다.</string>
+</resources>

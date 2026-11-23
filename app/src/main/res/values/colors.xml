@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bb_background">#FF0B0F14</color>
+    <color name="bb_surface">#FF131A22</color>
+    <color name="bb_surface_high">#FF1B242E</color>
+    <color name="bb_primary">#FFFF3B30</color>
+    <color name="bb_on_primary">#FFFFFFFF</color>
+    <color name="bb_primary_container">#FF3A1210</color>
+    <color name="bb_accent">#FF29B6F6</color>
+    <color name="bb_text">#FFE6EDF3</color>
+    <color name="bb_text_dim">#FF8B98A5</color>
+    <color name="bb_locked">#FFFFC107</color>
+    <color name="bb_record">#FFFF3B30</color>
+    <color name="bb_icon_bg">#FF0B0F14</color>
+    <color name="bb_scrim">#99000000</color>
+    <color name="bb_divider">#22FFFFFF</color>
+</resources>

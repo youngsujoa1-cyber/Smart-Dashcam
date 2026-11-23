@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bb_background">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:implementationMode="performance"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:scaleType="fillCenter" />
+
+    <!-- HUD -->
+    <LinearLayout
+        android:id="@+id/hudPanel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="12dp"
+        android:background="@drawable/bg_hud_panel"
+        android:orientation="vertical"
+        android:padding="12dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <View
+                android:id="@+id/recDot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:background="@drawable/bg_rec_dot_idle" />
+
+            <TextView
+                android:id="@+id/tvRecordState"
+                style="@style/TextAppearance.PickleBlackbox.HudLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/hud_idle"
+                android:textAllCaps="false" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/tvSegment"
+                style="@style/TextAppearance.PickleBlackbox.HudLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="10dp"
+                android:text="@string/hud_idle" />
+
+            <TextView
+                android:id="@+id/tvTimer"
+                style="@style/TextAppearance.PickleBlackbox.Timer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/hud_timer_placeholder" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvDateTime"
+                style="@style/TextAppearance.PickleBlackbox.HudValue"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/hud_idle" />
+
+            <TextView
+                android:id="@+id/tvLens"
+                style="@style/TextAppearance.PickleBlackbox.HudValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/hud_lens_back" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvSpeed"
+                style="@style/TextAppearance.PickleBlackbox.HudValue"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/hud_speed_unknown" />
+
+            <TextView
+                android:id="@+id/tvStorage"
+                style="@style/TextAppearance.PickleBlackbox.HudLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/hud_idle" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvLockBadge"
+            style="@style/TextAppearance.PickleBlackbox.HudLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_badge"
+            android:text="@string/hud_locked_badge"
+            android:textColor="@color/bb_background"
+            android:textStyle="bold"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Side buttons -->
+    <LinearLayout
+        android:id="@+id/sideButtons"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="12dp"
+        android:orientation="vertical"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/hudPanel">
+
+        <ImageButton
+            android:id="@+id/btnSwitchCamera"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:background="@drawable/bg_hud_button"
+            android:contentDescription="@string/action_switch_camera"
+            android:padding="14dp"
+            android:src="@drawable/ic_switch_camera"
+            app:tint="@color/bb_text" />
+
+        <ImageButton
+            android:id="@+id/btnLock"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_hud_button"
+            android:contentDescription="@string/action_lock_clip"
+            android:padding="14dp"
+            android:src="@drawable/ic_lock"
+            app:tint="@color/bb_text" />
+
+        <ImageButton
+            android:id="@+id/btnGallery"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_hud_button"
+            android:contentDescription="@string/action_open_gallery"
+            android:padding="14dp"
+            android:src="@drawable/ic_gallery"
+            app:tint="@color/bb_text" />
+
+        <ImageButton
+            android:id="@+id/btnSettings"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_hud_button"
+            android:contentDescription="@string/action_settings"
+            android:padding="14dp"
+            android:src="@drawable/ic_settings"
+            app:tint="@color/bb_text" />
+    </LinearLayout>
+
+    <!-- Permission notice -->
+    <LinearLayout
+        android:id="@+id/permissionPanel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="24dp"
+        android:background="@drawable/bg_hud_panel"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:padding="20dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:id="@+id/tvPermissionNotice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/permission_required"
+            android:textColor="@color/bb_text"
+            android:textSize="14sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPermissionRetry"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="@string/permission_retry" />
+    </LinearLayout>
+
+    <!-- Record button -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/btnRecord"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="18dp"
+        android:contentDescription="@string/action_start_recording"
+        app:backgroundTint="@color/bb_record"
+        app:elevation="6dp"
+        app:fabSize="normal"
+        app:layout_constraintBottom_toTopOf="@id/adContainer"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:maxImageSize="34dp"
+        app:srcCompat="@drawable/ic_record"
+        app:tint="@android:color/white" />
+
+    <!-- AdMob banner (bottom of the main screen) -->
+    <FrameLayout
+        android:id="@+id/adContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@color/bb_surface"
+        android:minHeight="50dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
