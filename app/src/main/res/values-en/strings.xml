@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Main screen HUD -->
+    <string name="hud_idle">Waiting</string>
+    <string name="hud_recording">REC</string>
+    <string name="hud_saving">Saving…</string>
+    <string name="hud_timer_placeholder">00:00:00</string>
+    <string name="hud_lens_back">Rear camera</string>
+    <string name="hud_lens_front">Front camera</string>
+    <string name="hud_speed_unknown">Waiting for GPS</string>
+    <string name="hud_speed_format">%1$d km/h</string>
+    <string name="hud_storage_format">Storage %1$s / %2$s</string>
+    <string name="hud_segment_format">Segment %1$d min</string>
+    <string name="hud_locked_badge">Current clip locked</string>
+    <string name="hud_locked_next_badge">Locking from next clip</string>
+
+    <!-- Actions -->
+    <string name="action_start_recording">Start recording</string>
+    <string name="action_stop_recording">Stop recording</string>
+    <string name="action_switch_camera">Switch front/rear camera</string>
+    <string name="action_lock_clip">Lock current clip</string>
+    <string name="action_open_gallery">Recordings</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_close">Close</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_play">Play</string>
+    <string name="action_lock">Lock</string>
+    <string name="action_unlock">Unlock</string>
+
+    <!-- Permission -->
+    <string name="permission_required">Camera and microphone access is required to record.\nAllowing notifications shows an alert while recording.\nEnable the permissions in Settings or try again.</string>
+    <string name="permission_retry">Request permissions again</string>
+
+    <!-- Gallery -->
+    <string name="gallery_title">Recordings</string>
+    <string name="gallery_empty">No saved videos yet.\nStart a recording from the main screen.</string>
+    <string name="gallery_summary_format">%1$d items · %2$s</string>
+    <string name="gallery_summary_locked">%1$d locked</string>
+    <string name="gallery_summary_loading">Loading…</string>
+    <string name="gallery_meta_format">%1$s · %2$s · %3$s</string>
+    <string name="gallery_player_title">Play %1$s</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Recording settings</string>
+    <string name="settings_language_title">App language</string>
+    <string name="settings_language_note">The selected language applies to the whole app right away.</string>
+    <string name="language_system">System (device language)</string>
+    <string name="settings_segment_title">Segment length</string>
+    <string name="settings_segment_1min">1 min</string>
+    <string name="settings_segment_3min">3 min</string>
+    <string name="settings_segment_5min">5 min</string>
+    <string name="settings_storage_title">Storage limit (normal videos)</string>
+    <string name="settings_storage_1gb">1GB</string>
+    <string name="settings_storage_2gb">2GB</string>
+    <string name="settings_storage_5gb">5GB</string>
+    <string name="settings_sensitivity_title">Impact sensitivity (further right is more sensitive)</string>
+    <string name="settings_sensitivity_value">Level %1$d / 5 · Threshold %2$s</string>
+    <string name="settings_auto_lock">Auto-lock when an impact is detected</string>
+    <string name="settings_record_audio">Record sound as well</string>
+    <string name="settings_show_speed">Show GPS speed</string>
+    <string name="settings_note">Locked videos are excluded from the storage cleanup.\nSettings apply from the next segment.\nRecording keeps going when you leave the app or turn off the screen.</string>
+
+    <!-- Background recording notification -->
+    <string name="notification_channel_name">Recording</string>
+    <string name="notification_channel_description">Shows the background recording status.</string>
+    <string name="notification_title">spyblackbox is recording</string>
+    <string name="notification_text">Keeps recording with the screen off</string>
+    <string name="notification_text_locked">Current segment is locked</string>
+    <string name="notification_preparing">Preparing to record…</string>
+    <string name="notification_action_stop">Stop</string>
+
+    <!-- Toasts / dialogs -->
+    <string name="toast_switch_while_recording">You cannot switch cameras while recording. Stop first.</string>
+    <string name="toast_camera_unavailable">No usable camera was found.</string>
+    <string name="toast_nothing_to_lock">There is no video to lock.</string>
+    <string name="toast_lock_scheduled">The current clip will be locked.</string>
+    <string name="toast_lock_latest">Latest video locked: %1$s</string>
+    <string name="toast_unlock_forbidden">Unlocking is done from the recordings list.</string>
+    <string name="toast_impact_detected">Impact detected (%1$s) — current video locked</string>
+    <string name="toast_impact_only">Impact detected (%1$s)</string>
+    <string name="toast_saved">Saved: %1$s</string>
+    <string name="toast_saved_locked">Locked video saved: %1$s</string>
+    <string name="toast_save_failed">Could not save the video.</string>
+    <string name="toast_settings_saved">Settings saved.</string>
+    <string name="toast_no_mic_permission">Microphone permission is missing, recording without sound.</string>
+    <string name="dialog_delete_title">Delete this video?</string>
+    <string name="dialog_delete_message">%1$s\nDeleted videos cannot be recovered.</string>
+    <string name="toast_delete_done">Deleted.</string>
+</resources>

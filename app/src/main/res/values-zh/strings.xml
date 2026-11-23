@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Main screen HUD -->
+    <string name="hud_idle">待机中</string>
+    <string name="hud_recording">REC</string>
+    <string name="hud_saving">正在保存…</string>
+    <string name="hud_timer_placeholder">00:00:00</string>
+    <string name="hud_lens_back">后置摄像头</string>
+    <string name="hud_lens_front">前置摄像头</string>
+    <string name="hud_speed_unknown">正在等待 GPS</string>
+    <string name="hud_speed_format">%1$d km/h</string>
+    <string name="hud_storage_format">存储 %1$s / %2$s</string>
+    <string name="hud_segment_format">分段 %1$d 分钟</string>
+    <string name="hud_locked_badge">当前片段已锁定</string>
+    <string name="hud_locked_next_badge">从下一段开始锁定</string>
+
+    <!-- Actions -->
+    <string name="action_start_recording">开始录像</string>
+    <string name="action_stop_recording">停止录像</string>
+    <string name="action_switch_camera">切换前/后摄像头</string>
+    <string name="action_lock_clip">锁定当前片段</string>
+    <string name="action_open_gallery">录像列表</string>
+    <string name="action_settings">设置</string>
+    <string name="action_close">关闭</string>
+    <string name="action_save">保存</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_delete">删除</string>
+    <string name="action_play">播放</string>
+    <string name="action_lock">锁定</string>
+    <string name="action_unlock">解锁</string>
+
+    <!-- Permission -->
+    <string name="permission_required">需要允许相机和麦克风权限才能录像。\n允许通知权限后，录像时会显示通知。\n请在设置中开启权限或重试。</string>
+    <string name="permission_retry">重新请求权限</string>
+
+    <!-- Gallery -->
+    <string name="gallery_title">录像列表</string>
+    <string name="gallery_empty">没有已保存的录像。\n请在主界面开始录像。</string>
+    <string name="gallery_summary_format">%1$d 个 · %2$s</string>
+    <string name="gallery_summary_locked">已锁定 %1$d 个</string>
+    <string name="gallery_summary_loading">正在加载…</string>
+    <string name="gallery_meta_format">%1$s · %2$s · %3$s</string>
+    <string name="gallery_player_title">播放 %1$s</string>
+
+    <!-- Settings -->
+    <string name="settings_title">录像设置</string>
+    <string name="settings_language_title">应用语言</string>
+    <string name="settings_language_note">所选语言会立即应用到整个应用。</string>
+    <string name="language_system">系统设置（设备语言）</string>
+    <string name="settings_segment_title">录像分段长度</string>
+    <string name="settings_segment_1min">1 分钟</string>
+    <string name="settings_segment_3min">3 分钟</string>
+    <string name="settings_segment_5min">5 分钟</string>
+    <string name="settings_storage_title">存储容量上限（普通录像）</string>
+    <string name="settings_storage_1gb">1GB</string>
+    <string name="settings_storage_2gb">2GB</string>
+    <string name="settings_storage_5gb">5GB</string>
+    <string name="settings_sensitivity_title">碰撞灵敏度（越往右越灵敏）</string>
+    <string name="settings_sensitivity_value">灵敏度 %1$d / 5 · 基准 %2$s</string>
+    <string name="settings_auto_lock">检测到碰撞时自动锁定</string>
+    <string name="settings_record_audio">同时录制声音</string>
+    <string name="settings_show_speed">显示 GPS 速度</string>
+    <string name="settings_note">已锁定的录像不参与容量清理。\n设置从下一个录像分段开始生效。\n离开应用或关闭屏幕后仍会继续录像。</string>
+
+    <!-- Background recording notification -->
+    <string name="notification_channel_name">录像通知</string>
+    <string name="notification_channel_description">显示后台录像状态。</string>
+    <string name="notification_title">spyblackbox 正在录像</string>
+    <string name="notification_text">关闭屏幕也会继续录像</string>
+    <string name="notification_text_locked">当前分段已锁定</string>
+    <string name="notification_preparing">正在准备录像…</string>
+    <string name="notification_action_stop">停止</string>
+
+    <!-- Toasts / dialogs -->
+    <string name="toast_switch_while_recording">录像中无法切换摄像头，请先停止。</string>
+    <string name="toast_camera_unavailable">找不到可用的摄像头。</string>
+    <string name="toast_nothing_to_lock">没有可锁定的录像。</string>
+    <string name="toast_lock_scheduled">将锁定当前片段。</string>
+    <string name="toast_lock_latest">已锁定最近的录像：%1$s</string>
+    <string name="toast_unlock_forbidden">解锁请在录像列表中进行。</string>
+    <string name="toast_impact_detected">检测到碰撞（%1$s）— 已锁定当前录像</string>
+    <string name="toast_impact_only">检测到碰撞（%1$s）</string>
+    <string name="toast_saved">已保存：%1$s</string>
+    <string name="toast_saved_locked">已保存锁定录像：%1$s</string>
+    <string name="toast_save_failed">录像保存失败。</string>
+    <string name="toast_settings_saved">设置已保存。</string>
+    <string name="toast_no_mic_permission">没有麦克风权限，将静音录像。</string>
+    <string name="dialog_delete_title">要删除这段录像吗？</string>
+    <string name="dialog_delete_message">%1$s\n删除后无法恢复。</string>
+    <string name="toast_delete_done">已删除。</string>
+</resources>

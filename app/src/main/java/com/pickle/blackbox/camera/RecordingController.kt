@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.Surface
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.PendingRecording
 import androidx.camera.video.Recorder
@@ -29,7 +30,8 @@ import java.util.concurrent.Executors
 class RecordingController(
     private val context: Context,
     private val settings: AppSettings,
-    private val clipStorage: ClipStorage
+    private val clipStorage: ClipStorage,
+    private val rotationProvider: () -> Int = { Surface.ROTATION_0 }
 ) {
 
     interface Listener {
@@ -38,6 +40,9 @@ class RecordingController(
         fun onSegmentSaved(clip: Clip?)
         fun onSegmentLocked()
         fun onError(message: String)
+
+        /** The loop is paused (current segment finalized) and waits for [RecordingController.resume]. */
+        fun onPausedForSwitch()
     }
 
     var listener: Listener? = null
@@ -55,6 +60,7 @@ class RecordingController(
     private var lockNextSegment = false
     private var segmentIndex = 0
     private var active = false
+    private var paused = false
 
     val isRecording: Boolean
         get() = active
@@ -75,7 +81,39 @@ class RecordingController(
             return
         }
         active = true
+        paused = false
         segmentIndex = 0
+        startSegment(capture)
+    }
+
+    /**
+     * Stops recording the running segment (it is published normally) and holds the loop until
+     * [resume] is called. Used when the camera has to be rebound, e.g. a front/rear switch
+     * while recording: the session, its timer and the foreground service all stay alive.
+     */
+    fun pauseForCameraSwitch() {
+        if (!active || paused) return
+        paused = true
+        mainHandler.removeCallbacks(rotateRunnable)
+        val current = recording
+        if (current == null) {
+            listener?.onPausedForSwitch()
+        } else {
+            // Finalize publishes the segment and then reports onPausedForSwitch().
+            runCatching { current.stop() }
+        }
+    }
+
+    /** Continues the loop with the currently attached capture after a [pauseForCameraSwitch]. */
+    fun resume() {
+        if (!active || !paused) return
+        paused = false
+        val capture = videoCapture
+        if (capture == null) {
+            active = false
+            listener?.onRecordingStopped()
+            return
+        }
         startSegment(capture)
     }
 
@@ -112,6 +150,7 @@ class RecordingController(
 
     fun release() {
         active = false
+        paused = false
         mainHandler.removeCallbacks(rotateRunnable)
         val current = recording
         recording = null
@@ -129,6 +168,10 @@ class RecordingController(
         currentSegmentLocked = lockNextSegment
         lockNextSegment = false
         segmentIndex += 1
+
+        // Each segment follows the current screen orientation, so rotating the phone
+        // between segments gives correctly oriented footage.
+        runCatching { capture.targetRotation = rotationProvider() }
 
         val outputOptions = FileOutputOptions.Builder(file).build()
         var pending: PendingRecording = capture.output.prepareRecording(context, outputOptions)
@@ -202,6 +245,11 @@ class RecordingController(
     private fun continueOrFinish() {
         if (!active) {
             listener?.onRecordingStopped()
+            return
+        }
+        if (paused) {
+            // Camera switch in progress: wait for resume().
+            listener?.onPausedForSwitch()
             return
         }
         val capture = videoCapture

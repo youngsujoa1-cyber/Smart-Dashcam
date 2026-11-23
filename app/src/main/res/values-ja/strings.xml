@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Main screen HUD -->
+    <string name="hud_idle">待機中</string>
+    <string name="hud_recording">REC</string>
+    <string name="hud_saving">保存中…</string>
+    <string name="hud_timer_placeholder">00:00:00</string>
+    <string name="hud_lens_back">後方カメラ</string>
+    <string name="hud_lens_front">前方カメラ</string>
+    <string name="hud_speed_unknown">GPS 待機中</string>
+    <string name="hud_speed_format">%1$d km/h</string>
+    <string name="hud_storage_format">保存 %1$s / %2$s</string>
+    <string name="hud_segment_format">区間 %1$d分</string>
+    <string name="hud_locked_badge">現在のクリップをロック</string>
+    <string name="hud_locked_next_badge">次のクリップからロック</string>
+
+    <!-- Actions -->
+    <string name="action_start_recording">録画開始</string>
+    <string name="action_stop_recording">録画停止</string>
+    <string name="action_switch_camera">前後カメラを切り替え</string>
+    <string name="action_lock_clip">現在のクリップをロック</string>
+    <string name="action_open_gallery">録画一覧</string>
+    <string name="action_settings">設定</string>
+    <string name="action_close">閉じる</string>
+    <string name="action_save">保存</string>
+    <string name="action_cancel">キャンセル</string>
+    <string name="action_delete">削除</string>
+    <string name="action_play">再生</string>
+    <string name="action_lock">ロック</string>
+    <string name="action_unlock">ロック解除</string>
+
+    <!-- Permission -->
+    <string name="permission_required">録画にはカメラとマイクの権限が必要です。\n通知を許可すると録画中に通知が表示されます。\n設定で権限を有効にするか、もう一度お試しください。</string>
+    <string name="permission_retry">権限を再リクエスト</string>
+
+    <!-- Gallery -->
+    <string name="gallery_title">録画一覧</string>
+    <string name="gallery_empty">保存された映像がありません。\nメイン画面から録画を開始してください。</string>
+    <string name="gallery_summary_format">%1$d件 · %2$s</string>
+    <string name="gallery_summary_locked">ロック %1$d件</string>
+    <string name="gallery_summary_loading">読み込み中…</string>
+    <string name="gallery_meta_format">%1$s · %2$s · %3$s</string>
+    <string name="gallery_player_title">%1$s を再生</string>
+
+    <!-- Settings -->
+    <string name="settings_title">録画設定</string>
+    <string name="settings_language_title">アプリの言語</string>
+    <string name="settings_language_note">選択した言語はアプリ全体にすぐ反映されます。</string>
+    <string name="language_system">システム設定（端末の言語）</string>
+    <string name="settings_segment_title">録画区間の長さ</string>
+    <string name="settings_segment_1min">1分</string>
+    <string name="settings_segment_3min">3分</string>
+    <string name="settings_segment_5min">5分</string>
+    <string name="settings_storage_title">保存容量の上限（通常映像）</string>
+    <string name="settings_storage_1gb">1GB</string>
+    <string name="settings_storage_2gb">2GB</string>
+    <string name="settings_storage_5gb">5GB</string>
+    <string name="settings_sensitivity_title">衝撃感度（右ほど敏感）</string>
+    <string name="settings_sensitivity_value">感度 %1$d / 5 · 基準 %2$s</string>
+    <string name="settings_auto_lock">衝撃検知時に自動ロック</string>
+    <string name="settings_record_audio">音声も録音する</string>
+    <string name="settings_show_speed">GPS 速度を表示</string>
+    <string name="settings_note">ロックした映像は容量整理の対象外です。\n設定は次の録画区間から適用されます。\n録画はアプリを離れても、画面を消しても続きます。</string>
+
+    <!-- Background recording notification -->
+    <string name="notification_channel_name">録画通知</string>
+    <string name="notification_channel_description">バックグラウンド録画の状態を表示します。</string>
+    <string name="notification_title">spyblackbox 録画中</string>
+    <string name="notification_text">画面を消しても録画は続きます</string>
+    <string name="notification_text_locked">現在の区間はロックされています</string>
+    <string name="notification_preparing">録画の準備中…</string>
+    <string name="notification_action_stop">停止</string>
+
+    <!-- Toasts / dialogs -->
+    <string name="toast_switch_while_recording">録画中はカメラを切り替えられません。停止してから切り替えてください。</string>
+    <string name="toast_camera_unavailable">利用できるカメラが見つかりません。</string>
+    <string name="toast_nothing_to_lock">ロックする映像がありません。</string>
+    <string name="toast_lock_scheduled">現在のクリップをロックします。</string>
+    <string name="toast_lock_latest">最新の映像をロック: %1$s</string>
+    <string name="toast_unlock_forbidden">ロック解除は一覧画面で行えます。</string>
+    <string name="toast_impact_detected">衝撃を検知（%1$s）— 現在の映像をロック</string>
+    <string name="toast_impact_only">衝撃を検知（%1$s）</string>
+    <string name="toast_saved">保存しました: %1$s</string>
+    <string name="toast_saved_locked">ロック映像を保存しました: %1$s</string>
+    <string name="toast_save_failed">映像の保存に失敗しました。</string>
+    <string name="toast_settings_saved">設定を保存しました。</string>
+    <string name="toast_no_mic_permission">マイクの権限がないため、音声なしで録画します。</string>
+    <string name="dialog_delete_title">この映像を削除しますか？</string>
+    <string name="dialog_delete_message">%1$s\n削除した映像は元に戻せません。</string>
+    <string name="toast_delete_done">削除しました。</string>
+</resources>

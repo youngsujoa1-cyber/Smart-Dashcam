@@ -42,6 +42,11 @@ class AppSettings(context: Context) {
         get() = prefs.getBoolean(KEY_SHOW_SPEED, true)
         set(value) = prefs.edit { putBoolean(KEY_SHOW_SPEED, value) }
 
+    /** BCP-47 language tag chosen in the app ("" = follow the system language). */
+    var languageTag: String
+        get() = prefs.getString(KEY_LANGUAGE_TAG, "") ?: ""
+        set(value) = prefs.edit { putString(KEY_LANGUAGE_TAG, value) }
+
     // ---- derived ----------------------------------------------------------
 
     val segmentMillis: Long
@@ -62,6 +67,7 @@ class AppSettings(context: Context) {
         private const val KEY_AUTO_LOCK = "auto_lock_on_impact"
         private const val KEY_RECORD_AUDIO = "record_audio"
         private const val KEY_SHOW_SPEED = "show_speed"
+        private const val KEY_LANGUAGE_TAG = "language_tag"
 
         const val DEFAULT_SEGMENT_MINUTES = 3
         const val DEFAULT_STORAGE_LIMIT_GB = 2

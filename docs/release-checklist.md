@@ -42,3 +42,12 @@
 - [ ] AdMob 광고 노출/수익 지표 확인
 - [ ] 크래시(Android vitals) 모니터링
 - [ ] Play 정책 업데이트 확인 (매년 targetSdk 요건 상향)
+
+## G. 백그라운드 녹화 · 권한 (spyblackbox 1.1.0)
+- [ ] `RecordingService` 가 `foregroundServiceType="camera|microphone|location"` 으로 선언되어 있는지 확인
+- [ ] Play Console **포그라운드 서비스** 선언에 녹화 목적 기재 (Android 14+ 정책)
+- [ ] 알림 권한(`POST_NOTIFICATIONS`) 요청 문구에 녹화 중 알림 목적 설명
+- [ ] 홈 버튼·다른 앱 전환·화면 꺼짐 상태에서 녹화가 계속되는지 실제 기기 확인
+- [ ] 녹화 중 전면/후면 전환 시 앞 구간이 저장되고 새 구간이 이어지는지 확인
+- [ ] 세로/가로 회전 시 미리보기와 새 구간 방향 확인
+- [ ] 설정 → 앱 언어에서 5개 언어 전환 후 화면·토스트·상시 알림 문구 확인

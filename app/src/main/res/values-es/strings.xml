@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Main screen HUD -->
+    <string name="hud_idle">En espera</string>
+    <string name="hud_recording">REC</string>
+    <string name="hud_saving">Guardando…</string>
+    <string name="hud_timer_placeholder">00:00:00</string>
+    <string name="hud_lens_back">Cámara trasera</string>
+    <string name="hud_lens_front">Cámara frontal</string>
+    <string name="hud_speed_unknown">Esperando GPS</string>
+    <string name="hud_speed_format">%1$d km/h</string>
+    <string name="hud_storage_format">Guardado %1$s / %2$s</string>
+    <string name="hud_segment_format">Segmento %1$d min</string>
+    <string name="hud_locked_badge">Clip actual bloqueado</string>
+    <string name="hud_locked_next_badge">Bloquear desde el próximo clip</string>
+
+    <!-- Actions -->
+    <string name="action_start_recording">Iniciar grabación</string>
+    <string name="action_stop_recording">Detener grabación</string>
+    <string name="action_switch_camera">Cambiar cámara frontal/trasera</string>
+    <string name="action_lock_clip">Bloquear clip actual</string>
+    <string name="action_open_gallery">Grabaciones</string>
+    <string name="action_settings">Ajustes</string>
+    <string name="action_close">Cerrar</string>
+    <string name="action_save">Guardar</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_delete">Eliminar</string>
+    <string name="action_play">Reproducir</string>
+    <string name="action_lock">Bloquear</string>
+    <string name="action_unlock">Desbloquear</string>
+
+    <!-- Permission -->
+    <string name="permission_required">Para grabar necesitas permitir el acceso a la cámara y al micrófono.\nSi permites las notificaciones verás un aviso mientras grabas.\nActiva los permisos en Ajustes o inténtalo de nuevo.</string>
+    <string name="permission_retry">Volver a pedir permisos</string>
+
+    <!-- Gallery -->
+    <string name="gallery_title">Grabaciones</string>
+    <string name="gallery_empty">Aún no hay vídeos guardados.\nInicia una grabación en la pantalla principal.</string>
+    <string name="gallery_summary_format">%1$d elementos · %2$s</string>
+    <string name="gallery_summary_locked">%1$d bloqueados</string>
+    <string name="gallery_summary_loading">Cargando…</string>
+    <string name="gallery_meta_format">%1$s · %2$s · %3$s</string>
+    <string name="gallery_player_title">Reproducir %1$s</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Ajustes de grabación</string>
+    <string name="settings_language_title">Idioma de la app</string>
+    <string name="settings_language_note">El idioma elegido se aplica al instante en toda la app.</string>
+    <string name="language_system">Sistema (idioma del dispositivo)</string>
+    <string name="settings_segment_title">Duración del segmento</string>
+    <string name="settings_segment_1min">1 min</string>
+    <string name="settings_segment_3min">3 min</string>
+    <string name="settings_segment_5min">5 min</string>
+    <string name="settings_storage_title">Límite de almacenamiento (vídeos normales)</string>
+    <string name="settings_storage_1gb">1 GB</string>
+    <string name="settings_storage_2gb">2 GB</string>
+    <string name="settings_storage_5gb">5 GB</string>
+    <string name="settings_sensitivity_title">Sensibilidad al impacto (más a la derecha, más sensible)</string>
+    <string name="settings_sensitivity_value">Sensibilidad %1$d / 5 · Umbral %2$s</string>
+    <string name="settings_auto_lock">Bloquear al detectar un impacto</string>
+    <string name="settings_record_audio">Grabar también el sonido</string>
+    <string name="settings_show_speed">Mostrar velocidad del GPS</string>
+    <string name="settings_note">Los vídeos bloqueados quedan fuera de la limpieza de almacenamiento.\nLos ajustes se aplican desde el siguiente segmento.\nLa grabación continúa al salir de la app o apagar la pantalla.</string>
+
+    <!-- Background recording notification -->
+    <string name="notification_channel_name">Grabación</string>
+    <string name="notification_channel_description">Muestra el estado de la grabación en segundo plano.</string>
+    <string name="notification_title">spyblackbox está grabando</string>
+    <string name="notification_text">Sigue grabando con la pantalla apagada</string>
+    <string name="notification_text_locked">El segmento actual está bloqueado</string>
+    <string name="notification_preparing">Preparando la grabación…</string>
+    <string name="notification_action_stop">Detener</string>
+
+    <!-- Toasts / dialogs -->
+    <string name="toast_switch_while_recording">No puedes cambiar de cámara mientras grabas. Detén la grabación primero.</string>
+    <string name="toast_camera_unavailable">No se encontró ninguna cámara disponible.</string>
+    <string name="toast_nothing_to_lock">No hay ningún vídeo para bloquear.</string>
+    <string name="toast_lock_scheduled">Se bloqueará el clip actual.</string>
+    <string name="toast_lock_latest">Último vídeo bloqueado: %1$s</string>
+    <string name="toast_unlock_forbidden">El desbloqueo se hace desde la lista de grabaciones.</string>
+    <string name="toast_impact_detected">Impacto detectado (%1$s): vídeo actual bloqueado</string>
+    <string name="toast_impact_only">Impacto detectado (%1$s)</string>
+    <string name="toast_saved">Guardado: %1$s</string>
+    <string name="toast_saved_locked">Vídeo bloqueado guardado: %1$s</string>
+    <string name="toast_save_failed">No se pudo guardar el vídeo.</string>
+    <string name="toast_settings_saved">Ajustes guardados.</string>
+    <string name="toast_no_mic_permission">Sin permiso de micrófono: se graba sin sonido.</string>
+    <string name="dialog_delete_title">¿Eliminar este vídeo?</string>
+    <string name="dialog_delete_message">%1$s\nLos vídeos eliminados no se pueden recuperar.</string>
+    <string name="toast_delete_done">Eliminado.</string>
+</resources>

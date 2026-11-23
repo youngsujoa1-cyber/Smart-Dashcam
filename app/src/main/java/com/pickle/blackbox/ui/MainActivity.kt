@@ -1,40 +1,48 @@
 package com.pickle.blackbox.ui
 
 import android.Manifest
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
+import android.os.IBinder
 import android.os.Looper
-import android.os.SystemClock
+import android.view.Surface
+import android.widget.ArrayAdapter
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.Preview
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.pickle.blackbox.BlackboxApp
 import com.pickle.blackbox.R
 import com.pickle.blackbox.ads.AdManager
-import com.pickle.blackbox.camera.CameraController
-import com.pickle.blackbox.camera.RecordingController
 import com.pickle.blackbox.databinding.ActivityMainBinding
 import com.pickle.blackbox.databinding.DialogSettingsBinding
-import com.pickle.blackbox.location.SpeedTracker
 import com.pickle.blackbox.media.Clip
 import com.pickle.blackbox.media.ClipStorage
-import com.pickle.blackbox.sensor.ImpactDetector
+import com.pickle.blackbox.service.RecordingService
 import com.pickle.blackbox.settings.AppSettings
+import com.pickle.blackbox.util.AppLanguage
 import com.pickle.blackbox.util.Formatters
 import java.util.Locale
 
 /**
  * Dashcam main screen: live preview + HUD, record/stop, lens switch, manual lock,
  * gallery entry point and settings. Ads: bottom banner + interstitial on stop/settings.
+ *
+ * The camera and the recording itself live in [RecordingService]; this screen only
+ * drives it and shows its state, so leaving the app never interrupts a recording.
  */
-class MainActivity : AppCompatActivity(), RecordingController.Listener {
+class MainActivity : AppCompatActivity(), RecordingService.UiListener {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var app: BlackboxApp
@@ -42,13 +50,9 @@ class MainActivity : AppCompatActivity(), RecordingController.Listener {
     private lateinit var clipStorage: ClipStorage
     private lateinit var adManager: AdManager
 
-    private lateinit var cameraController: CameraController
-    private lateinit var recordingController: RecordingController
-    private lateinit var impactDetector: ImpactDetector
-    private lateinit var speedTracker: SpeedTracker
-
     private val handler = Handler(Looper.getMainLooper())
-    private var sessionStartElapsed = 0L
+    private var service: RecordingService? = null
+    private var bound = false
     private var lastSpeedKmh = -1f
     private var isRecordingUi = false
     private var showAdAfterStop = false
@@ -58,33 +62,36 @@ class MainActivity : AppCompatActivity(), RecordingController.Listener {
             val cameraGranted = grants[Manifest.permission.CAMERA] == true ||
                 hasPermission(Manifest.permission.CAMERA)
             binding.permissionPanel.isVisible = !cameraGranted
-            if (cameraGranted) startCamera()
+            if (cameraGranted) connectToService()
         }
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+            val localBinder = binder as? RecordingService.LocalBinder ?: return
+            val recordingService = localBinder.service
+            service = recordingService
+            recordingService.setPreviewTarget(binding.previewView.surfaceProvider)
+            recordingService.attachUi(this@MainActivity)
+            applyRotationToService()
+            syncWithService()
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            service = null
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
         app = applicationContext as BlackboxApp
         settings = app.settings
         clipStorage = app.clipStorage
         adManager = app.adManager
+        // Re-applies the stored language (a no-op when the app already started with it).
+        AppLanguage.apply(settings.languageTag)
 
-        recordingController = RecordingController(this, settings, clipStorage)
-        recordingController.listener = this
-
-        cameraController = CameraController(this, this, binding.previewView).apply {
-            onReady = { capture -> recordingController.attach(capture) }
-            onError = { message -> toast(message) }
-            onLensChanged = { isFront ->
-                binding.tvLens.text =
-                    getString(if (isFront) R.string.hud_lens_front else R.string.hud_lens_back)
-            }
-        }
-
-        impactDetector = ImpactDetector(this, { settings.impactThresholdG }) { g -> onImpactDetected(g) }
-        speedTracker = SpeedTracker(this) { kmh -> lastSpeedKmh = kmh }
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
         wireUi()
         adManager.createBanner(binding.adContainer)
@@ -102,24 +109,23 @@ class MainActivity : AppCompatActivity(), RecordingController.Listener {
         }
 
         binding.btnSwitchCamera.setOnClickListener {
-            if (isRecordingUi) {
-                toast(getString(R.string.toast_switch_while_recording))
+            // Allowed while recording too: the service finalizes the current segment,
+            // rebinds the other lens and continues recording without ending the session.
+            val recordingService = service
+            if (recordingService == null) {
+                connectToService()
                 return@setOnClickListener
             }
-            if (!cameraController.switchCamera()) {
-                toast(getString(R.string.toast_camera_unavailable))
-            }
+            recordingService.switchCamera()
         }
 
         binding.btnLock.setOnClickListener { lockCurrentOrLatest() }
 
         binding.btnGallery.setOnClickListener {
-            if (recordingController.isRecording) stopRecording(showAd = false)
             adManager.showInterstitial(this) { openGallery() }
         }
 
         binding.btnSettings.setOnClickListener {
-            if (recordingController.isRecording) stopRecording(showAd = false)
             adManager.showInterstitial(this) { showSettingsDialog() }
         }
 
@@ -132,7 +138,7 @@ class MainActivity : AppCompatActivity(), RecordingController.Listener {
         val missing = requiredPermissions().filterNot { hasPermission(it) }
         if (missing.isEmpty()) {
             binding.permissionPanel.isVisible = false
-            startCamera()
+            connectToService()
             return
         }
         // Ask on first launch and on retry; the system decides whether to show a dialog.
@@ -143,6 +149,9 @@ class MainActivity : AppCompatActivity(), RecordingController.Listener {
         add(Manifest.permission.CAMERA)
         add(Manifest.permission.RECORD_AUDIO)
         add(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.POST_NOTIFICATIONS)
+        }
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
             add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
@@ -151,15 +160,29 @@ class MainActivity : AppCompatActivity(), RecordingController.Listener {
     private fun hasPermission(permission: String): Boolean =
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
-    // ----------------------------------------------------------------- camera
+    // ----------------------------------------------------------------- service
 
-    private fun startCamera() {
+    private fun connectToService() {
         if (!hasPermission(Manifest.permission.CAMERA)) {
             binding.permissionPanel.isVisible = true
             return
         }
-        cameraController.start()
-        speedTracker.start()
+        if (!bound) {
+            bound = bindService(
+                Intent(this, RecordingService::class.java),
+                serviceConnection,
+                Context.BIND_AUTO_CREATE
+            )
+        }
+    }
+
+    private fun syncWithService() {
+        val recordingService = service ?: return
+        isRecordingUi = recordingService.isRecording
+        applyRecordingUi(isRecordingUi)
+        binding.tvLens.text = getString(
+            if (recordingService.isFrontCamera) R.string.hud_lens_front else R.string.hud_lens_back
+        )
     }
 
     private fun startRecording() {
@@ -168,48 +191,51 @@ class MainActivity : AppCompatActivity(), RecordingController.Listener {
             return
         }
         if (!hasPermission(Manifest.permission.RECORD_AUDIO)) {
-            toast("마이크 권한이 없어 무음으로 녹화합니다.")
+            toast(getString(R.string.toast_no_mic_permission))
         }
-        speedTracker.start()
         binding.tvLockBadge.isVisible = false
         showAdAfterStop = false
-        recordingController.start()
+        connectToService()
+        ContextCompat.startForegroundService(
+            this,
+            Intent(this, RecordingService::class.java).setAction(RecordingService.ACTION_START)
+        )
     }
 
     private fun stopRecording(showAd: Boolean) {
-        if (!recordingController.isRecording) return
         showAdAfterStop = showAd
-        recordingController.stop()
+        val recordingService = service
+        if (recordingService != null && recordingService.isRecording) {
+            recordingService.stopRecording()
+        } else {
+            startService(
+                Intent(this, RecordingService::class.java).setAction(RecordingService.ACTION_STOP)
+            )
+        }
     }
 
     // --------------------------------------------------- recording callbacks
 
-    override fun onRecordingStarted(segmentIndex: Int) {
-        if (segmentIndex <= 1) {
-            sessionStartElapsed = SystemClock.elapsedRealtime()
-        }
+    override fun onCameraReady(preview: Preview, isFrontCamera: Boolean) {
+        binding.tvLens.text =
+            getString(if (isFrontCamera) R.string.hud_lens_front else R.string.hud_lens_back)
+    }
+
+    override fun onLensChanged(isFrontCamera: Boolean) {
+        binding.tvLens.text =
+            getString(if (isFrontCamera) R.string.hud_lens_front else R.string.hud_lens_back)
+    }
+
+    override fun onRecordingStarted() {
         isRecordingUi = true
-        binding.previewView.keepScreenOn = true
-        binding.btnRecord.setImageResource(R.drawable.ic_stop)
-        binding.btnRecord.contentDescription = getString(R.string.action_stop_recording)
-        binding.recDot.setBackgroundResource(R.drawable.bg_rec_dot_active)
-        binding.tvRecordState.setText(R.string.hud_recording)
-        binding.tvRecordState.setTextColor(ContextCompat.getColor(this, R.color.bb_primary))
-        binding.tvSegment.text = getString(R.string.hud_segment_format, settings.segmentMinutes)
-        if (!impactDetector.isRunning) impactDetector.start()
+        applyRecordingUi(true)
     }
 
     override fun onRecordingStopped() {
         isRecordingUi = false
-        binding.previewView.keepScreenOn = false
-        binding.btnRecord.setImageResource(R.drawable.ic_record)
-        binding.btnRecord.contentDescription = getString(R.string.action_start_recording)
-        binding.recDot.setBackgroundResource(R.drawable.bg_rec_dot_idle)
-        binding.tvRecordState.setText(R.string.hud_idle)
-        binding.tvRecordState.setTextColor(ContextCompat.getColor(this, R.color.bb_text_dim))
+        applyRecordingUi(false)
         binding.tvTimer.text = getString(R.string.hud_timer_placeholder)
         binding.tvLockBadge.isVisible = false
-        impactDetector.stop()
         updateStorageInfo()
 
         if (showAdAfterStop && !isFinishing && !isDestroyed) {
@@ -234,14 +260,43 @@ class MainActivity : AppCompatActivity(), RecordingController.Listener {
         binding.tvLockBadge.setText(R.string.hud_locked_badge)
     }
 
+    override fun onImpact(gForce: Float, locked: Boolean) {
+        val gText = String.format(Locale.US, "%.1fG", gForce)
+        if (locked) {
+            binding.tvLockBadge.isVisible = true
+            binding.tvLockBadge.setText(R.string.hud_locked_badge)
+            toast(getString(R.string.toast_impact_detected, gText))
+        } else {
+            toast(getString(R.string.toast_impact_only, gText))
+        }
+    }
+
     override fun onError(message: String) {
         toast(message)
+    }
+
+    private fun applyRecordingUi(recording: Boolean) {
+        binding.previewView.keepScreenOn = recording
+        binding.btnRecord.setImageResource(
+            if (recording) R.drawable.ic_stop else R.drawable.ic_record
+        )
+        binding.btnRecord.contentDescription = getString(
+            if (recording) R.string.action_stop_recording else R.string.action_start_recording
+        )
+        binding.recDot.setBackgroundResource(
+            if (recording) R.drawable.bg_rec_dot_active else R.drawable.bg_rec_dot_idle
+        )
+        binding.tvRecordState.setText(if (recording) R.string.hud_recording else R.string.hud_idle)
+        binding.tvRecordState.setTextColor(
+            ContextCompat.getColor(this, if (recording) R.color.bb_primary else R.color.bb_text_dim)
+        )
+        binding.tvSegment.text = getString(R.string.hud_segment_format, settings.segmentMinutes)
     }
 
     // ---------------------------------------------------------------- actions
 
     private fun lockCurrentOrLatest() {
-        if (recordingController.lockCurrentSegment()) {
+        if (service?.lockCurrentSegment() == true) {
             binding.tvLockBadge.isVisible = true
             binding.tvLockBadge.setText(R.string.hud_locked_badge)
             toast(getString(R.string.toast_lock_scheduled))
@@ -252,21 +307,9 @@ class MainActivity : AppCompatActivity(), RecordingController.Listener {
             if (clip == null) {
                 toast(getString(R.string.toast_nothing_to_lock))
             } else {
-                toast("최근 영상 잠금: " + clip.displayName.removePrefix(ClipStorage.LOCKED_PREFIX))
+                toast(getString(R.string.toast_lock_latest, clip.displayName.removePrefix(ClipStorage.LOCKED_PREFIX)))
             }
             updateStorageInfo()
-        }
-    }
-
-    private fun onImpactDetected(gForce: Float) {
-        if (!isRecordingUi) return
-        val gText = String.format(Locale.US, "%.1fG", gForce)
-        if (settings.autoLockOnImpact && recordingController.lockCurrentSegment()) {
-            binding.tvLockBadge.isVisible = true
-            binding.tvLockBadge.setText(R.string.hud_locked_badge)
-            toast(getString(R.string.toast_impact_detected, gText))
-        } else {
-            toast(getString(R.string.toast_impact_only, gText))
         }
     }
 
@@ -305,6 +348,19 @@ class MainActivity : AppCompatActivity(), RecordingController.Listener {
         dialogBinding.swAudio.isChecked = settings.recordAudio
         dialogBinding.swSpeed.isChecked = settings.showSpeed
 
+        val languageOptions = AppLanguage.options(this)
+        val languageTags = languageOptions.map { it.first }
+        dialogBinding.spLanguage.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            languageOptions.map { it.second }
+        ).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        dialogBinding.spLanguage.setSelection(
+            languageTags.indexOf(settings.languageTag).coerceAtLeast(0)
+        )
+
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.settings_title)
             .setView(dialogBinding.root)
@@ -328,7 +384,17 @@ class MainActivity : AppCompatActivity(), RecordingController.Listener {
 
                 binding.tvSegment.text = getString(R.string.hud_segment_format, minutes)
                 updateStorageInfo()
-                toast(getString(R.string.toast_settings_saved))
+
+                val selectedTag = languageTags.getOrElse(dialogBinding.spLanguage.selectedItemPosition) { "" }
+                val languageChanged = selectedTag != settings.languageTag
+                settings.languageTag = selectedTag
+                if (languageChanged) {
+                    // Recreates the activity chain with the new locale.
+                    AppLanguage.apply(selectedTag)
+                    service?.refreshNotification()
+                } else {
+                    toast(getString(R.string.toast_settings_saved))
+                }
             }
             .setNegativeButton(R.string.action_cancel, null)
             .show()
@@ -349,15 +415,15 @@ class MainActivity : AppCompatActivity(), RecordingController.Listener {
         override fun run() {
             binding.tvDateTime.text = Formatters.nowDateTime()
 
-            if (isRecordingUi) {
-                val elapsed = SystemClock.elapsedRealtime() - sessionStartElapsed
-                binding.tvTimer.text = Formatters.clock(elapsed)
-                val remaining = settings.segmentMillis - (elapsed % settings.segmentMillis)
+            val recordingService = service
+            if (isRecordingUi && recordingService != null) {
+                binding.tvTimer.text = Formatters.clock(recordingService.sessionElapsedMs)
                 binding.tvSegment.text =
                     getString(R.string.hud_segment_format, settings.segmentMinutes) +
-                    " · " + Formatters.duration(remaining)
+                    " · " + Formatters.duration(recordingService.segmentRemainingMs)
             }
 
+            lastSpeedKmh = recordingService?.speedKmh ?: -1f
             binding.tvSpeed.isVisible = settings.showSpeed
             if (settings.showSpeed) {
                 binding.tvSpeed.text = if (lastSpeedKmh < 0f) {
@@ -387,23 +453,36 @@ class MainActivity : AppCompatActivity(), RecordingController.Listener {
     override fun onStart() {
         super.onStart()
         handler.post(ticker)
-        speedTracker.start()
         updateStorageInfo()
+        connectToService()
     }
 
     override fun onStop() {
         super.onStop()
         handler.removeCallbacks(ticker)
-        speedTracker.stop()
-        // CameraX unbinds when the activity stops, so finalize the segment explicitly.
-        if (recordingController.isRecording) stopRecording(showAd = false)
+        // The service keeps the camera and the recording; the screen only detaches.
+        service?.detachUi(this)
+        if (bound) {
+            unbindService(serviceConnection)
+            bound = false
+        }
+        service = null
     }
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
-        impactDetector.stop()
-        recordingController.release()
         super.onDestroy()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // The screen was rotated: keep the preview and the next recorded segment in step.
+        applyRotationToService()
+    }
+
+    private fun applyRotationToService() {
+        val rotation = binding.root.display?.rotation ?: Surface.ROTATION_0
+        service?.setTargetRotation(rotation)
     }
 
     private fun toast(message: String) {
