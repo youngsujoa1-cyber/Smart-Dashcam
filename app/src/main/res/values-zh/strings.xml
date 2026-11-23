@@ -67,7 +67,7 @@
     <!-- Background recording notification -->
     <string name="notification_channel_name">录像通知</string>
     <string name="notification_channel_description">显示后台录像状态。</string>
-    <string name="notification_title">RoadEye 正在录像</string>
+    <string name="notification_title">RoadEyeCam 正在录像</string>
     <string name="notification_text">关闭屏幕也会继续录像</string>
     <string name="notification_text_locked">当前分段已锁定</string>
     <string name="notification_preparing">正在准备录像…</string>

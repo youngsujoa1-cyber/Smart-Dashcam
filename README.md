@@ -1,12 +1,12 @@
-# 🚗 RoadEye
+# 🚗 RoadEyeCam
 
 안드로이드 블랙박스(대시캠) 앱입니다. **Kotlin + CameraX + Material 3 + AdMob** 으로 만들었고,
 Gradle Kotlin DSL 프로젝트로 바로 빌드할 수 있는 상태입니다.
-앱 이름은 **RoadEye** 이고, 한국어 · English · 日本語 · 中文 · Español 5개 언어를 지원합니다.
+앱 이름은 **RoadEyeCam** 이고, 한국어 · English · 日本語 · 中文 · Español 5개 언어를 지원합니다.
 
 | 항목 | 값 |
 | --- | --- |
-| 앱 이름 | RoadEye (`com.pickle.blackbox`) |
+| 앱 이름 | RoadEyeCam (`com.pickle.blackbox`) |
 | 플랫폼 | Android (Kotlin) |
 | minSdk / targetSdk / compileSdk | 26 / 35 / 35 |
 | AGP / Gradle / Kotlin | 8.7.3 / 8.9 / 2.0.21 |
@@ -25,7 +25,7 @@ Gradle Kotlin DSL 프로젝트로 바로 빌드할 수 있는 상태입니다.
 - 녹화는 **`RecordingService`(포그라운드 서비스)** 안에서 돌아갑니다. CameraX 의 `Preview` + `VideoCapture`
   유스케이스를 Activity 가 아니라 **서비스의 생명주기**에 바인딩했기 때문에, 홈 버튼을 누르거나 다른 앱으로
   전환하거나 화면을 꺼도 **녹화 세션과 구간 루프가 끊기지 않습니다.**
-- 녹화 중에는 상단 알림 영역에 **"RoadEye 녹화 중"** 상시 알림이 표시됩니다.
+- 녹화 중에는 상단 알림 영역에 **"RoadEyeCam 녹화 중"** 상시 알림이 표시됩니다.
   - 알림을 누르면 앱이 다시 열리고, **중지** 액션으로 바로 녹화를 멈출 수 있습니다.
   - 녹화 중에는 서비스가 `startForeground` 상태라 시스템이 앱을 정리하지 않습니다.
 - 앱으로 돌아오면 미리보기만 서비스의 카메라 세션에 다시 연결합니다. **재바인딩이 아니므로 녹화는 그대로**입니다.
@@ -120,7 +120,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ### 2.3 디버그 빌드 정보
 - 패키지명: `com.pickle.blackbox.debug` (정식 빌드와 함께 설치 가능)
-- 앱 이름: **RoadEye**
+- 앱 이름: **RoadEyeCam**
 - 서명: 디버그 키 자동 서명 (Play 업로드는 4장 참고)
 
 ---
@@ -168,12 +168,12 @@ MobileAds.setRequestConfiguration(
 
 1. **서명 키 생성**
    ```bash
-   keytool -genkeypair -v -keystore roadeye-upload.jks \
-     -alias roadeye -keyalg RSA -keysize 2048 -validity 10000
+   keytool -genkeypair -v -keystore roadeyecam-upload.jks \
+     -alias roadeyecam -keyalg RSA -keysize 2048 -validity 10000
    ```
    `*.jks` 는 `.gitignore` 로 커밋되지 않습니다. 분실하면 업데이트가 불가능합니다.
 2. **`app/build.gradle.kts` 의 release 서명 설정** (`TODO(PlayStore)` 부분) + `keystore.properties`(gitignore 대상)
-3. `versionCode` / `versionName` 증가 (현재 4 / 1.2.0)
+3. `versionCode` / `versionName` 증가 (현재 5 / 1.2.1)
 4. **AAB 빌드** → `./gradlew bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`
 5. **Play Console**
    - 앱 콘텐츠: 카메라·마이크·위치·알림 권한 사용 목적 설명

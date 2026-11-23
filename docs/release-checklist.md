@@ -43,7 +43,7 @@
 - [ ] 크래시(Android vitals) 모니터링
 - [ ] Play 정책 업데이트 확인 (매년 targetSdk 요건 상향)
 
-## G. 백그라운드 녹화 · 권한 (RoadEye 1.1.0)
+## G. 백그라운드 녹화 · 권한 (RoadEyeCam 1.1.0)
 - [ ] `RecordingService` 가 `foregroundServiceType="camera|microphone|location"` 으로 선언되어 있는지 확인
 - [ ] Play Console **포그라운드 서비스** 선언에 녹화 목적 기재 (Android 14+ 정책)
 - [ ] 알림 권한(`POST_NOTIFICATIONS`) 요청 문구에 녹화 중 알림 목적 설명

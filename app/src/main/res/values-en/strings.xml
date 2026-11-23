@@ -67,7 +67,7 @@
     <!-- Background recording notification -->
     <string name="notification_channel_name">Recording</string>
     <string name="notification_channel_description">Shows the background recording status.</string>
-    <string name="notification_title">RoadEye is recording</string>
+    <string name="notification_title">RoadEyeCam is recording</string>
     <string name="notification_text">Keeps recording with the screen off</string>
     <string name="notification_text_locked">Current segment is locked</string>
     <string name="notification_preparing">Preparing to record…</string>
