@@ -57,9 +57,6 @@
     <string name="settings_storage_1gb">1 GB</string>
     <string name="settings_storage_2gb">2 GB</string>
     <string name="settings_storage_5gb">5 GB</string>
-    <string name="settings_sensitivity_title">Sensibilidad al impacto (más a la derecha, más sensible)</string>
-    <string name="settings_sensitivity_value">Sensibilidad %1$d / 5 · Umbral %2$s</string>
-    <string name="settings_auto_lock">Bloquear al detectar un impacto</string>
     <string name="settings_record_audio">Grabar también el sonido</string>
     <string name="settings_show_speed">Mostrar velocidad del GPS</string>
     <string name="settings_note">Los vídeos bloqueados quedan fuera de la limpieza de almacenamiento.\nLos ajustes se aplican desde el siguiente segmento.\nLa grabación continúa al salir de la app o apagar la pantalla.</string>
@@ -80,8 +77,6 @@
     <string name="toast_lock_scheduled">Se bloqueará el clip actual.</string>
     <string name="toast_lock_latest">Último vídeo bloqueado: %1$s</string>
     <string name="toast_unlock_forbidden">El desbloqueo se hace desde la lista de grabaciones.</string>
-    <string name="toast_impact_detected">Impacto detectado (%1$s): vídeo actual bloqueado</string>
-    <string name="toast_impact_only">Impacto detectado (%1$s)</string>
     <string name="toast_saved">Guardado: %1$s</string>
     <string name="toast_saved_locked">Vídeo bloqueado guardado: %1$s</string>
     <string name="toast_save_failed">No se pudo guardar el vídeo.</string>

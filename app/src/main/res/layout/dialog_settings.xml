@@ -101,40 +101,11 @@
                 android:text="@string/settings_storage_5gb" />
         </RadioGroup>
 
-        <TextView
-            style="@style/TextAppearance.PickleBlackbox.HudLabel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/settings_sensitivity_title" />
-
-        <SeekBar
-            android:id="@+id/sbSensitivity"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:max="5"
-            android:min="1" />
-
-        <TextView
-            android:id="@+id/tvSensitivityValue"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/bb_text_dim"
-            android:textSize="12sp" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/swAutoLock"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/settings_auto_lock"
-            android:textColor="@color/bb_text" />
-
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/swAudio"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="16dp"
             android:text="@string/settings_record_audio"
             android:textColor="@color/bb_text" />
 

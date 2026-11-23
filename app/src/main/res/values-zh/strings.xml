@@ -57,9 +57,6 @@
     <string name="settings_storage_1gb">1GB</string>
     <string name="settings_storage_2gb">2GB</string>
     <string name="settings_storage_5gb">5GB</string>
-    <string name="settings_sensitivity_title">碰撞灵敏度（越往右越灵敏）</string>
-    <string name="settings_sensitivity_value">灵敏度 %1$d / 5 · 基准 %2$s</string>
-    <string name="settings_auto_lock">检测到碰撞时自动锁定</string>
     <string name="settings_record_audio">同时录制声音</string>
     <string name="settings_show_speed">显示 GPS 速度</string>
     <string name="settings_note">已锁定的录像不参与容量清理。\n设置从下一个录像分段开始生效。\n离开应用或关闭屏幕后仍会继续录像。</string>
@@ -80,8 +77,6 @@
     <string name="toast_lock_scheduled">将锁定当前片段。</string>
     <string name="toast_lock_latest">已锁定最近的录像：%1$s</string>
     <string name="toast_unlock_forbidden">解锁请在录像列表中进行。</string>
-    <string name="toast_impact_detected">检测到碰撞（%1$s）— 已锁定当前录像</string>
-    <string name="toast_impact_only">检测到碰撞（%1$s）</string>
     <string name="toast_saved">已保存：%1$s</string>
     <string name="toast_saved_locked">已保存锁定录像：%1$s</string>
     <string name="toast_save_failed">录像保存失败。</string>

@@ -25,15 +25,6 @@ class AppSettings(context: Context) {
         get() = prefs.getInt(KEY_STORAGE_LIMIT_GB, DEFAULT_STORAGE_LIMIT_GB)
         set(value) = prefs.edit { putInt(KEY_STORAGE_LIMIT_GB, value) }
 
-    /** 1 = least sensitive, 5 = most sensitive. */
-    var impactSensitivity: Int
-        get() = prefs.getInt(KEY_IMPACT_SENSITIVITY, DEFAULT_SENSITIVITY).coerceIn(1, 5)
-        set(value) = prefs.edit { putInt(KEY_IMPACT_SENSITIVITY, value.coerceIn(1, 5)) }
-
-    var autoLockOnImpact: Boolean
-        get() = prefs.getBoolean(KEY_AUTO_LOCK, true)
-        set(value) = prefs.edit { putBoolean(KEY_AUTO_LOCK, value) }
-
     var recordAudio: Boolean
         get() = prefs.getBoolean(KEY_RECORD_AUDIO, true)
         set(value) = prefs.edit { putBoolean(KEY_RECORD_AUDIO, value) }
@@ -63,16 +54,10 @@ class AppSettings(context: Context) {
     val storageLimitBytes: Long
         get() = storageLimitGb * 1024L * 1024L * 1024L
 
-    /** G-force threshold used by [com.pickle.blackbox.sensor.ImpactDetector]. */
-    val impactThresholdG: Float
-        get() = thresholdFor(impactSensitivity)
-
     companion object {
         private const val PREFS_NAME = "pickle_blackbox_settings"
         private const val KEY_SEGMENT_MINUTES = "segment_minutes"
         private const val KEY_STORAGE_LIMIT_GB = "storage_limit_gb"
-        private const val KEY_IMPACT_SENSITIVITY = "impact_sensitivity"
-        private const val KEY_AUTO_LOCK = "auto_lock_on_impact"
         private const val KEY_RECORD_AUDIO = "record_audio"
         private const val KEY_SHOW_SPEED = "show_speed"
         private const val KEY_LANGUAGE_TAG = "language_tag"
@@ -80,15 +65,5 @@ class AppSettings(context: Context) {
 
         const val DEFAULT_SEGMENT_MINUTES = 3
         const val DEFAULT_STORAGE_LIMIT_GB = 2
-        const val DEFAULT_SENSITIVITY = 3
-
-        /** Maps the 1–5 sensitivity setting to the acceleration threshold in G. */
-        fun thresholdFor(level: Int): Float = when (level.coerceIn(1, 5)) {
-            5 -> 1.9f
-            4 -> 2.2f
-            3 -> 2.6f
-            2 -> 3.0f
-            else -> 3.4f
-        }
     }
 }

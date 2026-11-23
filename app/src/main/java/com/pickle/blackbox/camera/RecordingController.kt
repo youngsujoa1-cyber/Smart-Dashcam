@@ -24,8 +24,11 @@ import java.util.concurrent.Executors
 /**
  * Implements the dashcam loop: record a segment, finalize it into the gallery, enforce
  * the storage budget, and immediately start the next segment until the user stops.
- * A segment is flagged as locked (saved with the LOCKED_ prefix) when an impact is
- * detected or the user presses the lock button while it is being recorded.
+ * A segment is flagged as locked (saved with the LOCKED_ prefix) when the user presses
+ * the lock button while it is being recorded.
+ *
+ * The loop is driven by the service, never by a screen: backgrounding the app or turning
+ * the display off does not pause, stop or re-rotate the running segment.
  */
 class RecordingController(
     private val context: Context,
@@ -57,7 +60,6 @@ class RecordingController(
     private var recording: Recording? = null
     private var currentFile: File? = null
     private var currentSegmentLocked = false
-    private var lockNextSegment = false
     private var segmentIndex = 0
     private var active = false
     private var paused = false
@@ -143,11 +145,6 @@ class RecordingController(
         return true
     }
 
-    /** Used by the impact detector when a segment is about to start. */
-    fun lockNextSegmentAsWell() {
-        lockNextSegment = true
-    }
-
     fun release() {
         active = false
         paused = false
@@ -165,8 +162,7 @@ class RecordingController(
     private fun startSegment(capture: VideoCapture<Recorder>) {
         val file = clipStorage.newSegmentFile()
         currentFile = file
-        currentSegmentLocked = lockNextSegment
-        lockNextSegment = false
+        currentSegmentLocked = false
         segmentIndex += 1
 
         // Each segment follows the current screen orientation, so rotating the phone

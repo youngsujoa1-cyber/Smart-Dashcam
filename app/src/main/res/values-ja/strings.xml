@@ -57,9 +57,6 @@
     <string name="settings_storage_1gb">1GB</string>
     <string name="settings_storage_2gb">2GB</string>
     <string name="settings_storage_5gb">5GB</string>
-    <string name="settings_sensitivity_title">衝撃感度（右ほど敏感）</string>
-    <string name="settings_sensitivity_value">感度 %1$d / 5 · 基準 %2$s</string>
-    <string name="settings_auto_lock">衝撃検知時に自動ロック</string>
     <string name="settings_record_audio">音声も録音する</string>
     <string name="settings_show_speed">GPS 速度を表示</string>
     <string name="settings_note">ロックした映像は容量整理の対象外です。\n設定は次の録画区間から適用されます。\n録画はアプリを離れても、画面を消しても続きます。</string>
@@ -80,8 +77,6 @@
     <string name="toast_lock_scheduled">現在のクリップをロックします。</string>
     <string name="toast_lock_latest">最新の映像をロック: %1$s</string>
     <string name="toast_unlock_forbidden">ロック解除は一覧画面で行えます。</string>
-    <string name="toast_impact_detected">衝撃を検知（%1$s）— 現在の映像をロック</string>
-    <string name="toast_impact_only">衝撃を検知（%1$s）</string>
     <string name="toast_saved">保存しました: %1$s</string>
     <string name="toast_saved_locked">ロック映像を保存しました: %1$s</string>
     <string name="toast_save_failed">映像の保存に失敗しました。</string>

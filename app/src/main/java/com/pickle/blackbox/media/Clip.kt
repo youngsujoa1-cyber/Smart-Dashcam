@@ -10,7 +10,7 @@ import android.net.Uri
  * @param sizeBytes      file size in bytes
  * @param dateAddedSeconds epoch seconds from MediaStore.DATE_ADDED
  * @param durationMs     clip length in milliseconds
- * @param isLocked       true when this clip was locked (impact / manual)
+ * @param isLocked       true when this clip was locked manually by the user
  * @param filePath       absolute path when known (used for legacy thumbnails / fallbacks)
  */
 data class Clip(

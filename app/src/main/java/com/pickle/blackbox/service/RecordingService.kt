@@ -13,7 +13,9 @@ import android.os.Binder
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
+import android.util.Log
 import android.view.Surface
 import androidx.camera.core.Preview
 import androidx.core.app.NotificationCompat
@@ -30,7 +32,6 @@ import com.pickle.blackbox.camera.RecordingController
 import com.pickle.blackbox.location.SpeedTracker
 import com.pickle.blackbox.media.Clip
 import com.pickle.blackbox.media.ClipStorage
-import com.pickle.blackbox.sensor.ImpactDetector
 import com.pickle.blackbox.settings.AppSettings
 import com.pickle.blackbox.ui.MainActivity
 
@@ -43,6 +44,10 @@ import com.pickle.blackbox.ui.MainActivity
  * back. While recording, the service is a started foreground service with an ongoing
  * notification ("RoadEyeCam 녹화 중"); without a client and without a recording it
  * shuts itself down and releases the camera.
+ *
+ * While a recording is active the service holds a [PowerManager.PARTIAL_WAKE_LOCK]: with the
+ * screen off the CPU would otherwise be throttled or suspended between frames, which stops
+ * the encoder from receiving frames even though the foreground service keeps running.
  */
 class RecordingService : Service(), LifecycleOwner {
 
@@ -54,7 +59,6 @@ class RecordingService : Service(), LifecycleOwner {
         fun onRecordingStopped()
         fun onSegmentSaved(clip: Clip?)
         fun onSegmentLocked()
-        fun onImpact(gForce: Float, locked: Boolean)
         fun onError(message: String)
     }
 
@@ -74,8 +78,8 @@ class RecordingService : Service(), LifecycleOwner {
     private lateinit var clipStorage: ClipStorage
     private lateinit var cameraController: CameraController
     private lateinit var recordingController: RecordingController
-    private lateinit var impactDetector: ImpactDetector
     private lateinit var speedTracker: SpeedTracker
+    private var wakeLock: PowerManager.WakeLock? = null
 
     private var uiListener: UiListener? = null
     private var wantRecording = false
@@ -142,14 +146,16 @@ class RecordingService : Service(), LifecycleOwner {
 
     override fun onDestroy() {
         mainHandler.removeCallbacksAndMessages(null)
-        if (::impactDetector.isInitialized) impactDetector.stop()
         if (::speedTracker.isInitialized) speedTracker.stop()
         if (::recordingController.isInitialized) recordingController.release()
+        releaseWakeLock()
         if (inForeground) {
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             inForeground = false
         }
+        // Unbinds the camera use cases and frees the offscreen preview surface with them.
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+        if (::cameraController.isInitialized) cameraController.release()
         super.onDestroy()
     }
 
@@ -176,6 +182,7 @@ class RecordingService : Service(), LifecycleOwner {
     fun beginRecording() {
         ensureCamera()
         ensureForeground(getString(R.string.notification_preparing))
+        acquireWakeLock()
         wantRecording = true
         if (cameraReady) startSegmentsIfNeeded()
     }
@@ -275,7 +282,6 @@ class RecordingService : Service(), LifecycleOwner {
             }
             onLensChanged = { isFront -> uiListener?.onLensChanged(isFront) }
         }
-        impactDetector = ImpactDetector(this, { settings.impactThresholdG }) { g -> onImpactDetected(g) }
         speedTracker = SpeedTracker(this) { kmh -> speedKmh = kmh }
         speedTracker.start()
 
@@ -287,22 +293,14 @@ class RecordingService : Service(), LifecycleOwner {
         recordingController.start()
     }
 
-    private fun onImpactDetected(gForce: Float) {
-        if (!isRecording) return
-        val locked = settings.autoLockOnImpact && recordingController.lockCurrentSegment()
-        uiListener?.onImpact(gForce, locked)
-    }
-
     private val recordingListener = object : RecordingController.Listener {
         override fun onRecordingStarted(segmentIndex: Int) {
             if (segmentIndex <= 1) sessionStartElapsed = SystemClock.elapsedRealtime()
-            if (!impactDetector.isRunning) impactDetector.start()
             updateNotification(getString(R.string.notification_text))
             uiListener?.onRecordingStarted()
         }
 
         override fun onRecordingStopped() {
-            if (::impactDetector.isInitialized) impactDetector.stop()
             finishSession()
             uiListener?.onRecordingStopped()
         }
@@ -329,11 +327,58 @@ class RecordingService : Service(), LifecycleOwner {
     /** Called once a recording session has really ended (after the last segment was saved). */
     private fun finishSession() {
         wantRecording = false
+        releaseWakeLock()
         if (inForeground) {
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             inForeground = false
         }
         if (uiListener == null) stopSelf()
+    }
+
+    // ---------------------------------------------------------------- wake lock
+
+    /**
+     * Keeps the CPU awake while recording. START/STOP_WAKE_LOCK is repeated on a timer shorter
+     * than the safety timeout, so a long drive keeps its lock and a crashed session cannot
+     * hold one forever.
+     */
+    private fun acquireWakeLock() {
+        if (wakeLock == null) {
+            val powerManager = getSystemService(PowerManager::class.java)
+            if (powerManager == null) {
+                Log.w(TAG, "No PowerManager: background recording may be throttled")
+                return
+            }
+            wakeLock = powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "RoadEyeCam:recording"
+            ).apply { setReferenceCounted(false) }
+        }
+        try {
+            // (Re)starts the timeout, both on the first acquire and on every renewal.
+            wakeLock?.acquire(WAKE_LOCK_TIMEOUT_MS)
+            mainHandler.removeCallbacks(wakeLockRenewal)
+            mainHandler.postDelayed(wakeLockRenewal, WAKE_LOCK_RENEW_MS)
+        } catch (t: Throwable) {
+            Log.w(TAG, "Could not acquire the recording wake lock", t)
+        }
+    }
+
+    private fun releaseWakeLock() {
+        mainHandler.removeCallbacks(wakeLockRenewal)
+        val lock = wakeLock ?: return
+        wakeLock = null
+        try {
+            if (lock.isHeld) lock.release()
+        } catch (t: Throwable) {
+            Log.w(TAG, "Could not release the recording wake lock", t)
+        }
+    }
+
+    private val wakeLockRenewal = object : Runnable {
+        override fun run() {
+            if (wantRecording || isRecording) acquireWakeLock() else releaseWakeLock()
+        }
     }
 
     // -------------------------------------------------------------- notification
@@ -430,6 +475,12 @@ class RecordingService : Service(), LifecycleOwner {
         const val ACTION_START = "com.pickle.blackbox.action.START_RECORDING"
         const val ACTION_STOP = "com.pickle.blackbox.action.STOP_RECORDING"
         const val ACTION_REFRESH_NOTIFICATION = "com.pickle.blackbox.action.REFRESH_NOTIFICATION"
+
+        /** Safety net: the lock never outlives this without being renewed. */
+        private const val WAKE_LOCK_TIMEOUT_MS = 4 * 60 * 60 * 1000L
+
+        /** Renewed well before the timeout so a long drive never loses the lock. */
+        private const val WAKE_LOCK_RENEW_MS = 3 * 60 * 60 * 1000L
 
         private const val CHANNEL_ID = "recording"
         private const val NOTIFICATION_ID = 1001

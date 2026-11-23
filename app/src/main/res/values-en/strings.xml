@@ -57,9 +57,6 @@
     <string name="settings_storage_1gb">1GB</string>
     <string name="settings_storage_2gb">2GB</string>
     <string name="settings_storage_5gb">5GB</string>
-    <string name="settings_sensitivity_title">Impact sensitivity (further right is more sensitive)</string>
-    <string name="settings_sensitivity_value">Level %1$d / 5 · Threshold %2$s</string>
-    <string name="settings_auto_lock">Auto-lock when an impact is detected</string>
     <string name="settings_record_audio">Record sound as well</string>
     <string name="settings_show_speed">Show GPS speed</string>
     <string name="settings_note">Locked videos are excluded from the storage cleanup.\nSettings apply from the next segment.\nRecording keeps going when you leave the app or turn off the screen.</string>
@@ -80,8 +77,6 @@
     <string name="toast_lock_scheduled">The current clip will be locked.</string>
     <string name="toast_lock_latest">Latest video locked: %1$s</string>
     <string name="toast_unlock_forbidden">Unlocking is done from the recordings list.</string>
-    <string name="toast_impact_detected">Impact detected (%1$s) — current video locked</string>
-    <string name="toast_impact_only">Impact detected (%1$s)</string>
     <string name="toast_saved">Saved: %1$s</string>
     <string name="toast_saved_locked">Locked video saved: %1$s</string>
     <string name="toast_save_failed">Could not save the video.</string>

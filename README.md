@@ -7,6 +7,7 @@ Gradle Kotlin DSL 프로젝트로 바로 빌드할 수 있는 상태입니다.
 | 항목 | 값 |
 | --- | --- |
 | 앱 이름 | RoadEyeCam (`com.pickle.blackbox`) |
+| 버전 | 1.2.3 (versionCode 7) |
 | 플랫폼 | Android (Kotlin) |
 | minSdk / targetSdk / compileSdk | 26 / 35 / 35 |
 | AGP / Gradle / Kotlin | 8.7.3 / 8.9 / 2.0.21 |
@@ -29,6 +30,13 @@ Gradle Kotlin DSL 프로젝트로 바로 빌드할 수 있는 상태입니다.
   - 알림을 누르면 앱이 다시 열리고, **중지** 액션으로 바로 녹화를 멈출 수 있습니다.
   - 녹화 중에는 서비스가 `startForeground` 상태라 시스템이 앱을 정리하지 않습니다.
 - 앱으로 돌아오면 미리보기만 서비스의 카메라 세션에 다시 연결합니다. **재바인딩이 아니므로 녹화는 그대로**입니다.
+- 앱이 백그라운드로 가면(`MainActivity.onStop()`) 화면의 프리뷰 서피스는 사라지는데, 이때 `Preview` 유스케이스를
+  서피스 없이 두면 일부 기기(Samsung Camera2 HAL)에서는 반복 캡처 요청이 멈춰 `VideoCapture` 로 프레임이
+  들어오지 않고 **녹화 영상이 정지 화면으로 저장**됩니다. 그래서 서비스는 화면이 없을 때
+  **오프스크린 서피스(`ImageReader`, PRIVATE)** 를 프리뷰 소비자로 붙여 두고, 화면이 돌아오면 실제 프리뷰
+  서피스로 교체합니다(`CameraController.setPreviewSurfaceProvider`, `DummyPreviewSurface`).
+- 화면이 꺼진 상태에서도 CPU 가 잠들지 않도록 녹화 중에는 **`PARTIAL_WAKE_LOCK`**(4시간 안전 타임아웃, 3시간마다
+  갱신)을 잡습니다. 녹화가 끝나거나 서비스가 종료되면 즉시 해제합니다.
 - 서비스는 화면이 붙어 있지 않고 녹화도 없으면 스스로 종료하며 카메라를 놓아줍니다.
 
 ### 1.2 전면/후면 카메라 선택·전환 (녹화 중에도 전환 가능)
@@ -57,11 +65,10 @@ Gradle Kotlin DSL 프로젝트로 바로 빌드할 수 있는 상태입니다.
 - 촬영 중에는 임시 파일(`Android/data/<패키지>/files/segments`)에 쓰고, 구간이 끝나면 MediaStore로 게시한 뒤
   임시 파일을 지웁니다. 비정상 종료로 남은 임시 파일은 다음 실행 때 정리합니다.
 
-### 1.5 충격 감지(G-센서) + 수동 긴급 잠금
-- `SensorManager` 가속도 센서로 합성 가속도를 계산해 임계값(기본 2.6G)을 넘으면 충격으로 판단합니다(2초 쿨다운).
-  센서 감지는 서비스에서 돌기 때문에 **화면이 꺼져 있어도 동작**합니다.
-- 충격이 감지되면 그 순간 녹화 중인 구간이 **잠금 상태로 저장**됩니다.
+### 1.5 수동 긴급 잠금
 - 수동 잠금 버튼: 녹화 중이면 현재 구간, 아니면 가장 최근 영상을 잠급니다.
+- (1.2.3 에서 **충격 감지(G-센서) 자동 잠금은 제거**했습니다. `sensor/ImpactDetector.kt`, 충격 감도·자동 잠금
+  설정과 관련 문자열·레이아웃이 모두 삭제되어, 이제 클립 잠금은 사용자가 버튼으로만 할 수 있습니다.)
 - 잠금 영상은 파일명 앞에 **`LOCKED_`** 가 붙고, 용량 정리에서 **절대 삭제되지 않습니다.**
 
 ### 1.6 HUD
@@ -173,7 +180,7 @@ MobileAds.setRequestConfiguration(
    ```
    `*.jks` 는 `.gitignore` 로 커밋되지 않습니다. 분실하면 업데이트가 불가능합니다.
 2. **`app/build.gradle.kts` 의 release 서명 설정** (`TODO(PlayStore)` 부분) + `keystore.properties`(gitignore 대상)
-3. `versionCode` / `versionName` 증가 (현재 6 / 1.2.2)
+3. `versionCode` / `versionName` 증가 (현재 7 / 1.2.3)
 4. **AAB 빌드** → `./gradlew bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`
 5. **Play Console**
    - 앱 콘텐츠: 카메라·마이크·위치·알림 권한 사용 목적 설명
@@ -226,14 +233,13 @@ blackbox-app/
         │   │   ├── AdConfig.kt              # ★ 실제 광고 단위 ID 교체 위치
         │   │   └── AdManager.kt             # 배너 + 전면광고(쿨다운)
         │   ├── camera/
-        │   │   ├── CameraController.kt      # CameraX 바인딩 / 전·후면 전환 / 화면 방향
+        │   │   ├── CameraController.kt      # CameraX 바인딩 / 전·후면 전환 / 화면 방향 / 오프스크린 프리뷰 서피스
         │   │   └── RecordingController.kt   # 구간 루프 녹화 / 잠금 / 카메라 전환 시 일시정지·재개
         │   ├── location/SpeedTracker.kt     # GPS 속도(권한 안전)
         │   ├── media/
         │   │   ├── Clip.kt                  # 클립 모델
         │   │   ├── ClipStorage.kt           # MediaStore 게시·조회·삭제·용량 정리
         │   │   └── VideoThumbs.kt           # 목록 썸네일
-        │   ├── sensor/ImpactDetector.kt     # 가속도 센서 충격 감지
         │   ├── service/
         │   │   └── RecordingService.kt      # ★ 포그라운드 서비스: 백그라운드 녹화 + 상시 알림
         │   ├── settings/AppSettings.kt      # 사용자 설정(언어 포함)
@@ -261,6 +267,7 @@ blackbox-app/
 | `CAMERA` | 프리뷰·녹화 | 녹화 불가(안내 패널 표시) |
 | `RECORD_AUDIO` | 소리 함께 녹음 + FGS microphone 타입 | 무음으로 녹화 |
 | `ACCESS_FINE_LOCATION` | HUD 속도 표시 + FGS location 타입 | `GPS 대기` 표시, 앱은 정상 |
+| `WAKE_LOCK` | 화면이 꺼진 동안 녹화 파이프라인이 멈추지 않도록 CPU 유지 | 화면 꺼짐 시 프레임이 끊길 수 있음 |
 | `POST_NOTIFICATIONS` (API 33+) | 녹화 중 상시 알림 표시 | 녹화는 되지만 알림이 보이지 않음 |
 | `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_CAMERA` / `_MICROPHONE` / `_LOCATION` | 백그라운드(화면 꺼짐) 녹화 | 서비스 시작 불가 |
 | `WRITE_EXTERNAL_STORAGE` (≤ API 28) | 구형 기기에서 `Movies/PickleBlackbox` 쓰기 | 저장 실패 안내 |
@@ -278,8 +285,6 @@ blackbox-app/
 | 앱 언어 | 시스템 설정 / 한국어 / English / 日本語 / 中文 / Español | 시스템 설정 |
 | 녹화 구간 길이 | 1 / 3 / 5 분 | 3분 |
 | 저장 용량 한도 | 1 / 2 / 5 GB | 2GB |
-| 충격 감도 | 1(둔함, 3.4G) ~ 5(예민, 1.9G) | 3 (2.6G) |
-| 충격 감지 시 자동 잠금 | on/off | on |
 | 소리 함께 녹음 | on/off | on |
 | GPS 속도 표시 | on/off | on |
 
@@ -291,7 +296,7 @@ blackbox-app/
 
 - **녹화 중 회전**: 이미 녹화 중인 구간은 시작 당시 방향을 유지하고, 회전 이후 시작되는 다음 구간부터 새 방향이 적용됩니다.
 - **녹화 중 카메라 전환**: 현재 구간을 마감하고 새 구간으로 이어지므로, 전환 순간에 짧은 공백(수백 ms)이 생깁니다.
-- **배터리/발열**: 화면이 켜져 있으면 `keepScreenOn` 으로 화면을 유지합니다. 장시간 주차 녹화에는 전원 연결을 권장합니다.
+- **배터리/발열**: 화면이 켜져 있으면 `keepScreenOn` 으로 화면을 유지하고, 녹화 중에는 `PARTIAL_WAKE_LOCK` 을 잡습니다. 장시간 주차 녹화에는 전원 연결을 권장합니다.
 - **안드로이드 14+ 백그라운드 시작 제한**: 서비스는 항상 앱이 화면에 있을 때 시작되며, 시스템이 강제로 종료하면 자동 재시작하지 않습니다(`START_NOT_STICKY`).
 - 서비스는 알림의 **중지** 로 즉시 끝낼 수 있습니다.
 
@@ -308,7 +313,7 @@ blackbox-app/
 | 빌드는 되는데 설치 실패 | 디버그는 `com.pickle.blackbox.debug` 로 설치됩니다(서명 충돌 시 기존 앱 삭제) |
 | 저장된 영상이 안 보임 | 권한 허용 여부, 갤러리 앱 새로고침. 파일은 `Movies/PickleBlackbox` |
 | 광고가 안 뜸 | 인터넷 연결, 테스트 ID는 즉시 채워짐(빈 화면이면 SDK 초기화 로그 확인) |
-| 충격 감지가 너무 예민/둔함 | 설정 → 충격 감도 (1~5) 조정 |
+| 백그라운드 녹화 영상이 정지 화면 | 1.2.3 에서 오프스크린 프리뷰 서피스 + `PARTIAL_WAKE_LOCK` 으로 수정. 최신 APK 설치 후 확인 |
 | 앱 언어가 바뀌지 않음 | 설정 → 앱 언어에서 다시 선택(즉시 적용) |
 
 ---

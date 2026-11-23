@@ -17,7 +17,6 @@ import android.view.Surface
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
-import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -45,7 +44,6 @@ import com.pickle.blackbox.service.RecordingService
 import com.pickle.blackbox.settings.AppSettings
 import com.pickle.blackbox.util.AppLanguage
 import com.pickle.blackbox.util.Formatters
-import java.util.Locale
 
 /**
  * Dashcam main screen: live preview + HUD, record/stop, lens switch, manual lock,
@@ -358,17 +356,6 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
         binding.tvLockBadge.setText(R.string.hud_locked_badge)
     }
 
-    override fun onImpact(gForce: Float, locked: Boolean) {
-        val gText = String.format(Locale.US, "%.1fG", gForce)
-        if (locked) {
-            binding.tvLockBadge.isVisible = true
-            binding.tvLockBadge.setText(R.string.hud_locked_badge)
-            toast(getString(R.string.toast_impact_detected, gText))
-        } else {
-            toast(getString(R.string.toast_impact_only, gText))
-        }
-    }
-
     override fun onError(message: String) {
         toast(message)
     }
@@ -490,19 +477,6 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
             5 -> dialogBinding.rgStorage.check(dialogBinding.rbStorage5.id)
             else -> dialogBinding.rgStorage.check(dialogBinding.rbStorage2.id)
         }
-        dialogBinding.sbSensitivity.progress = settings.impactSensitivity
-        updateSensitivityLabel(dialogBinding)
-        dialogBinding.sbSensitivity.setOnSeekBarChangeListener(
-            object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) =
-                    updateSensitivityLabel(dialogBinding)
-
-                override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
-
-                override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
-            }
-        )
-        dialogBinding.swAutoLock.isChecked = settings.autoLockOnImpact
         dialogBinding.swAudio.isChecked = settings.recordAudio
         dialogBinding.swSpeed.isChecked = settings.showSpeed
 
@@ -535,8 +509,6 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
                 }
                 settings.segmentMinutes = minutes
                 settings.storageLimitGb = limitGb
-                settings.impactSensitivity = dialogBinding.sbSensitivity.progress.coerceIn(1, 5)
-                settings.autoLockOnImpact = dialogBinding.swAutoLock.isChecked
                 settings.recordAudio = dialogBinding.swAudio.isChecked
                 settings.showSpeed = dialogBinding.swSpeed.isChecked
 
@@ -556,15 +528,6 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
             }
             .setNegativeButton(R.string.action_cancel, null)
             .show()
-    }
-
-    private fun updateSensitivityLabel(dialogBinding: DialogSettingsBinding) {
-        val level = dialogBinding.sbSensitivity.progress.coerceIn(1, 5)
-        dialogBinding.tvSensitivityValue.text = getString(
-            R.string.settings_sensitivity_value,
-            level,
-            String.format(Locale.US, "%.1fG", AppSettings.thresholdFor(level))
-        )
     }
 
     // -------------------------------------------------------------------- HUD
@@ -618,7 +581,11 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
     override fun onStop() {
         super.onStop()
         handler.removeCallbacks(ticker)
-        // The service keeps the camera and the recording; the screen only detaches.
+        // The service keeps the camera and the recording; the screen only detaches. The preview
+        // gets the service's offscreen surface first, because a preview use case left without a
+        // consumer surface stalls the camera session (and freezes the recorded video) on some
+        // devices as soon as this window's surface is destroyed.
+        service?.setPreviewTarget(null)
         service?.detachUi(this)
         if (bound) {
             unbindService(serviceConnection)
