@@ -114,14 +114,22 @@ class CameraController(
         cameraProvider?.hasCamera(selectorFor(!isFrontCamera)) == true
 
     /**
-     * Follows the screen orientation. The preview turns immediately; a recording that is
-     * already running keeps its orientation and the next segment uses the new one.
+     * Follows the screen / device orientation. Both use cases are updated: the preview turns
+     * immediately, and the video capture takes the new rotation for the next segment (a
+     * segment that is already being recorded keeps its own orientation).
+     *
+     * The value is also kept as [targetRotation], so every later bind — a front/rear switch
+     * during a session, an error retry — builds its [VideoCapture] with this rotation instead
+     * of CameraX's default [Surface.ROTATION_0]. Missing this was what made the front camera
+     * record 9:16 after a lens switch while the rear camera recorded 16:9.
      */
     fun setTargetRotation(rotation: Int) {
         if (rotation == targetRotation) return
         targetRotation = rotation
         runCatching { preview?.targetRotation = rotation }
             .onFailure { Log.w(TAG, "Could not update the preview rotation", it) }
+        runCatching { videoCapture?.targetRotation = rotation }
+            .onFailure { Log.w(TAG, "Could not update the video rotation", it) }
     }
 
     /** Switches front <-> back and rebinds. Returns false when the target lens is missing. */
@@ -173,7 +181,12 @@ class CameraController(
         val recorder = Recorder.Builder()
             .setQualitySelector(qualitySelector)
             .build()
-        val capture = VideoCapture.withOutput(recorder)
+        // The rotation must be given at build time: `VideoCapture.withOutput(recorder)` would
+        // silently fall back to Surface.ROTATION_0 on every rebind (front/rear switch), which
+        // recorded a portrait 9:16 video from the lens that was bound that way.
+        val capture = VideoCapture.Builder(recorder)
+            .setTargetRotation(targetRotation)
+            .build()
 
         try {
             provider.unbindAll()

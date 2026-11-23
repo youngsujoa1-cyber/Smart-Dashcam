@@ -7,7 +7,7 @@ Gradle Kotlin DSL 프로젝트로 바로 빌드할 수 있는 상태입니다.
 | 항목 | 값 |
 | --- | --- |
 | 앱 이름 | RoadEyeCam (`com.pickle.blackbox`) |
-| 버전 | 1.2.3 (versionCode 7) |
+| 버전 | 1.2.4 (versionCode 8) |
 | 플랫폼 | Android (Kotlin) |
 | minSdk / targetSdk / compileSdk | 26 / 35 / 35 |
 | AGP / Gradle / Kotlin | 8.7.3 / 8.9 / 2.0.21 |
@@ -52,6 +52,12 @@ Gradle Kotlin DSL 프로젝트로 바로 빌드할 수 있는 상태입니다.
 - `configChanges` 로 회전을 직접 처리하므로 Activity 가 재생성되지 않고, 미리보기와 녹화가 끊기지 않습니다.
 - 현재 화면 방향은 서비스에 전달되어 **새로 시작하는 구간의 영상 방향**에 반영됩니다.
   (이미 녹화 중인 구간은 시작할 때의 방향을 유지합니다.)
+- **방향은 화면이 아니라 기기가 실제로 놓인 자세를 따릅니다.** 자동 회전을 꺼 두었거나(차량 거치 상태에서 흔함)
+  세로 고정 앱이 앞에 있으면 `Display.rotation` 이 세로(`ROTATION_0`)로 남아 영상이 세로로 저장될 수 있어,
+  `RecordingService` 가 **`OrientationEventListener`(가속도 센서)** 로 기기 각도를 읽어 `ROTATION_0/90/180/270`
+  으로 매핑합니다(±25° 이내일 때만 반영, 평평할 때는 마지막 값 유지). 센서를 쓸 수 없을 때만 화면 회전을 씁니다.
+- **전면/후면 어느 렌즈든 가로 녹화가 됩니다.** (1.2.4 에서 `VideoCapture` 를 만들 때 `setTargetRotation` 을
+  넘기고, 렌즈 전환 시에도 방향이 유지되도록 수정 — 이전에는 전면으로 바꾸면 9:16 세로로 저장됐습니다.)
 - **가로 화면에서 녹화 중일 때는 하단 광고 배너를 자동으로 숨깁니다.** 배너가 미리보기와 조작 버튼을
   가리지 않도록, 세로로 돌리거나 녹화를 멈추면 다시 나타납니다(`MainActivity.updateAdBanner()`,
   `onConfigurationChanged` 에서 즉시 반영).
@@ -180,7 +186,7 @@ MobileAds.setRequestConfiguration(
    ```
    `*.jks` 는 `.gitignore` 로 커밋되지 않습니다. 분실하면 업데이트가 불가능합니다.
 2. **`app/build.gradle.kts` 의 release 서명 설정** (`TODO(PlayStore)` 부분) + `keystore.properties`(gitignore 대상)
-3. `versionCode` / `versionName` 증가 (현재 7 / 1.2.3)
+3. `versionCode` / `versionName` 증가 (현재 8 / 1.2.4)
 4. **AAB 빌드** → `./gradlew bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`
 5. **Play Console**
    - 앱 콘텐츠: 카메라·마이크·위치·알림 권한 사용 목적 설명
@@ -314,6 +320,7 @@ blackbox-app/
 | 저장된 영상이 안 보임 | 권한 허용 여부, 갤러리 앱 새로고침. 파일은 `Movies/PickleBlackbox` |
 | 광고가 안 뜸 | 인터넷 연결, 테스트 ID는 즉시 채워짐(빈 화면이면 SDK 초기화 로그 확인) |
 | 백그라운드 녹화 영상이 정지 화면 | 1.2.3 에서 오프스크린 프리뷰 서피스 + `PARTIAL_WAKE_LOCK` 으로 수정. 최신 APK 설치 후 확인 |
+| 전면 카메라 영상이 세로(9:16)로 저장 | 1.2.4 에서 `VideoCapture.setTargetRotation(빌드 시점 적용)` + `OrientationEventListener` 로 수정. 최신 APK 설치 후 확인 |
 | 앱 언어가 바뀌지 않음 | 설정 → 앱 언어에서 다시 선택(즉시 적용) |
 
 ---

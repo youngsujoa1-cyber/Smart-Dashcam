@@ -16,6 +16,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
+import android.view.OrientationEventListener
 import android.view.Surface
 import androidx.camera.core.Preview
 import androidx.core.app.NotificationCompat
@@ -34,6 +35,7 @@ import com.pickle.blackbox.media.Clip
 import com.pickle.blackbox.media.ClipStorage
 import com.pickle.blackbox.settings.AppSettings
 import com.pickle.blackbox.ui.MainActivity
+import kotlin.math.abs
 
 /**
  * Runs the dashcam in the background.
@@ -87,6 +89,14 @@ class RecordingService : Service(), LifecycleOwner {
     private var cameraReady = false
     private var sessionStartElapsed = 0L
     private var switchingCamera = false
+
+    /** Rotation reported by the screen the activity is on (stale when auto-rotate is off). */
+    private var displayRotation: Int = Surface.ROTATION_0
+
+    /** Rotation the phone is really held in, from the accelerometer; null while unknown/flat. */
+    private var sensorRotation: Int? = null
+
+    /** Rotation every capture actually uses ([sensorRotation] when known, else [displayRotation]). */
     private var targetRotation: Int = Surface.ROTATION_0
 
     /** Last GPS speed in km/h, -1 when unknown. */
@@ -123,6 +133,7 @@ class RecordingService : Service(), LifecycleOwner {
 
         createNotificationChannel()
         ensureCamera()
+        enableOrientationTracking()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -145,6 +156,7 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     override fun onDestroy() {
+        disableOrientationTracking()
         mainHandler.removeCallbacksAndMessages(null)
         if (::speedTracker.isInitialized) speedTracker.stop()
         if (::recordingController.isInitialized) recordingController.release()
@@ -199,11 +211,59 @@ class RecordingService : Service(), LifecycleOwner {
     /** Locks the segment that is being recorded right now. */
     fun lockCurrentSegment(): Boolean = isRecording && recordingController.lockCurrentSegment()
 
-    /** Keeps the captured video oriented the same way as the screen. */
-    fun setTargetRotation(rotation: Int) {
+    /**
+     * Reports the rotation of the screen (from `Display.rotation`). It is only the fallback:
+     * while the phone is mounted in a car the screen is often locked to portrait (auto-rotate
+     * off) or the display rotation is simply stale, so the sensor value from
+     * [enableOrientationTracking] wins whenever it is available.
+     */
+    fun setDisplayRotation(rotation: Int) {
+        if (rotation == displayRotation) return
+        displayRotation = rotation
+        applyEffectiveRotation()
+    }
+
+    /** Keeps the captured video oriented the same way as the phone is really held. */
+    private fun applyEffectiveRotation() {
+        val rotation = sensorRotation ?: displayRotation
         if (rotation == targetRotation) return
         targetRotation = rotation
         if (::cameraController.isInitialized) cameraController.setTargetRotation(rotation)
+    }
+
+    // ----------------------------------------------------- device orientation
+
+    /**
+     * Follows how the phone is physically held, independent of the screen rotation.
+     *
+     * With auto-rotate off (common in a car mount) or while another portrait-locked app is in
+     * front, `Display.rotation` stays [Surface.ROTATION_0] although the phone lies sideways, and
+     * the recorded video came out portrait. The accelerometer reports the real angle, so the
+     * rotation of both the preview and of every new segment follows the phone itself.
+     */
+    private fun enableOrientationTracking() {
+        runCatching { orientationListener.enable() }
+            .onFailure { Log.w(TAG, "Could not enable orientation tracking", it) }
+    }
+
+    private fun disableOrientationTracking() {
+        runCatching { orientationListener.disable() }
+            .onFailure { Log.w(TAG, "Could not disable orientation tracking", it) }
+    }
+
+    private val orientationListener: OrientationEventListener by lazy {
+        object : OrientationEventListener(this) {
+            override fun onOrientationChanged(orientation: Int) {
+                if (orientation == ORIENTATION_UNKNOWN) return
+                // Only act when the phone is clearly inside one quadrant (±25°), so a phone
+                // lying at an odd angle keeps the last good rotation instead of flickering.
+                val rotation = rotationForOrientation(orientation) ?: return
+                if (rotation == sensorRotation) return
+                sensorRotation = rotation
+                applyEffectiveRotation()
+                // A running segment keeps its orientation until the segment timer rotates it.
+            }
+        }
     }
 
     /**
@@ -471,6 +531,39 @@ class RecordingService : Service(), LifecycleOwner {
 
     companion object {
         private const val TAG = "RecordingService"
+
+        /** Degrees the phone may sit away from a quadrant before that quadrant counts. */
+        private const val ORIENTATION_TOLERANCE_DEGREES = 25
+
+        /**
+         * Maps [OrientationEventListener] degrees to `Surface.ROTATION_*`.
+         *
+         * `OrientationEventListener` counts the angle the device was rotated counter-clockwise
+         * from its natural (portrait) position, while `Surface.ROTATION_*` counts the clockwise
+         * rotation the display is turned from natural orientation — hence 90 <-> 270.
+         *
+         * @return null when the angle is not clearly within one quadrant.
+         */
+        private fun rotationForOrientation(orientation: Int): Int? {
+            val candidates = intArrayOf(0, 90, 180, 270)
+            var nearest = 0
+            var nearestDistance = Int.MAX_VALUE
+            for (degrees in candidates) {
+                val raw = abs(orientation - degrees)
+                val distance = if (raw > 180) 360 - raw else raw
+                if (distance < nearestDistance) {
+                    nearestDistance = distance
+                    nearest = degrees
+                }
+            }
+            if (nearestDistance > ORIENTATION_TOLERANCE_DEGREES) return null
+            return when (nearest) {
+                0 -> Surface.ROTATION_0
+                90 -> Surface.ROTATION_270
+                180 -> Surface.ROTATION_180
+                else -> Surface.ROTATION_90
+            }
+        }
 
         const val ACTION_START = "com.pickle.blackbox.action.START_RECORDING"
         const val ACTION_STOP = "com.pickle.blackbox.action.STOP_RECORDING"

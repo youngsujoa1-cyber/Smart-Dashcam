@@ -13,7 +13,6 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.view.Gravity
-import android.view.Surface
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
@@ -629,8 +628,11 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
     }
 
     private fun applyRotationToService() {
-        val rotation = binding.root.display?.rotation ?: Surface.ROTATION_0
-        service?.setTargetRotation(rotation)
+        // Only a fallback for the service: the accelerometer orientation wins when it knows
+        // how the phone is really held (auto-rotate off, portrait-locked apps in front).
+        // When the screen is already detached, keep the last known value instead of sending 0.
+        val rotation = binding.root.display?.rotation ?: return
+        service?.setDisplayRotation(rotation)
     }
 
     private fun toast(message: String) {
