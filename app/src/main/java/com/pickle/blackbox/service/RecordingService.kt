@@ -9,6 +9,7 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.hardware.display.DisplayManager
 import android.os.Binder
 import android.os.Handler
 import android.os.IBinder
@@ -16,6 +17,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
+import android.view.Display
 import android.view.OrientationEventListener
 import android.view.Surface
 import androidx.camera.core.Preview
@@ -90,6 +92,9 @@ class RecordingService : Service(), LifecycleOwner {
     private var sessionStartElapsed = 0L
     private var switchingCamera = false
 
+    /** A rotation rebind is on its way: the running segment was finalized, the loop is paused. */
+    private var rebindingForRotation = false
+
     /** Rotation reported by the screen the activity is on (stale when auto-rotate is off). */
     private var displayRotation: Int = Surface.ROTATION_0
 
@@ -129,6 +134,13 @@ class RecordingService : Service(), LifecycleOwner {
     override fun onCreate() {
         super.onCreate()
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+
+        // Start from what the screen says instead of the ROTATION_0 default: the very first
+        // bindUseCases() bakes this rotation into the Recorder, and a portrait session at
+        // service start was exactly what kept the footage vertical. The accelerometer value
+        // overrides it as soon as it fits a quadrant.
+        displayRotation = currentDisplayRotation()
+        targetRotation = displayRotation
 
         val app = application as BlackboxApp
         settings = app.settings
@@ -200,6 +212,8 @@ class RecordingService : Service(), LifecycleOwner {
         ensureForeground(getString(R.string.notification_preparing))
         acquireWakeLock()
         wantRecording = true
+        switchingCamera = false
+        rebindingForRotation = false
         cancelOrientationRestart()
         // A phone that is already lying sideways must record landscape from second 0.
         refreshOrientationNow()
@@ -236,11 +250,31 @@ class RecordingService : Service(), LifecycleOwner {
         val rotation = sensorRotation ?: displayRotation
         if (rotation == targetRotation) return
         targetRotation = rotation
-        if (::cameraController.isInitialized) cameraController.setTargetRotation(rotation)
-        // Turning the phone in the middle of a segment splits it after a short debounce, so the
-        // footage keeps the orientation it actually had (instead of staying portrait for the
-        // whole 3-5 minute segment). Not while a camera switch is rebinding the session.
-        if (isRecording && !switchingCamera) scheduleOrientationRestart()
+        if (!::cameraController.isInitialized) return
+        // Turns the preview right away. The video capture only takes the new rotation for its
+        // next segment once the session is rebuilt (see CameraController.rebind): on Samsung
+        // devices the running Recorder keeps the encoder orientation it was bound with.
+        cameraController.setTargetRotation(rotation)
+        if (rebindingForRotation) {
+            // The rebind that is already on its way builds with this targetRotation anyway.
+            return
+        }
+        if (switchingCamera) {
+            // Likewise: the pending lens switch rebuilds the session with the new rotation.
+            return
+        }
+        if (isRecording) {
+            // Turning the phone in the middle of a segment splits it after a short debounce, so the
+            // footage keeps the orientation it actually had (instead of staying portrait for the
+            // whole 3-5 minute segment). The split is followed by a rebind.
+            scheduleOrientationRestart()
+            return
+        }
+        if (cameraReady && recordingController.isCaptureIdle) {
+            // Nothing is recording: rebuild now, so the next segment starts on a Recorder that was
+            // created with the new rotation instead of the one from service start.
+            rebindForRotation()
+        }
     }
 
     /**
@@ -275,10 +309,23 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     private val orientationRestart = Runnable {
-        if (!isRecording || switchingCamera) return@Runnable
-        // Tilting back within the debounce window leaves the running segment alone.
-        if (recordingController.currentSegmentRotation == targetRotation) return@Runnable
-        recordingController.rotateForOrientation()
+        if (switchingCamera || rebindingForRotation) return@Runnable
+        if (isRecording) {
+            // Tilting back within the debounce window leaves the running segment alone.
+            if (recordingController.currentSegmentRotation == targetRotation) return@Runnable
+            rebindingForRotation = true
+            // Finalize the running segment first, then rebuild the session with the new rotation
+            // and continue the loop (onPausedForSwitch -> rebindForRotation -> resume).
+            recordingController.pauseForRebind()
+            return@Runnable
+        }
+        if (cameraReady && recordingController.isCaptureIdle &&
+            cameraController.isBound && cameraController.boundRotation != targetRotation
+        ) {
+            // The immediate rebind in applyEffectiveRotation had to wait for a segment that was
+            // still finalizing back then; catch up now that the capture is free.
+            rebindForRotation()
+        }
     }
 
     // ----------------------------------------------------- device orientation
@@ -306,8 +353,10 @@ class RecordingService : Service(), LifecycleOwner {
             override fun onOrientationChanged(orientation: Int) {
                 if (orientation == ORIENTATION_UNKNOWN) return
                 lastOrientationDegrees = orientation
-                // Only act when the phone is clearly inside one quadrant (±25°), so a phone
-                // lying at an odd angle keeps the last good rotation instead of flickering.
+                // Only act when the phone is clearly inside one quadrant (±35°), so a phone
+                // lying at an odd angle keeps the last good rotation instead of flickering. The
+                // wide margin is for a dashboard / windshield mount, where the phone usually
+                // sits a good 10-20° away from level.
                 val rotation = rotationForOrientation(orientation) ?: return
                 if (rotation == sensorRotation) return
                 sensorRotation = rotation
@@ -334,6 +383,11 @@ class RecordingService : Service(), LifecycleOwner {
             return false
         }
         switchingCamera = true
+        if (rebindingForRotation) {
+            // A rotation rebind already finalized the segment and is on its way; the pending
+            // onPausedForSwitch picks the switch up and the rebuild applies both at once.
+            return true
+        }
         recordingController.pauseForCameraSwitch()
         return true
     }
@@ -345,8 +399,39 @@ class RecordingService : Service(), LifecycleOwner {
         if (!switched) {
             switchingCamera = false
             uiListener?.onError(getString(R.string.toast_camera_unavailable))
-            if (isRecording) recordingController.resume()
+            if (isRecording) {
+                rebindingForRotation = false
+                // A rotation change that was waiting for this rebuild still has to be applied.
+                if (cameraController.isBound && cameraController.boundRotation != targetRotation) {
+                    rebindForRotation()
+                } else {
+                    recordingController.resume()
+                }
+            }
         }
+        // On success the new capture arrives through cameraController.onReady -> resume().
+    }
+
+    /**
+     * Rebuilds the camera session with the current [targetRotation] (fresh Recorder, fresh
+     * VideoCapture), so a segment recorded after the phone was turned is saved in the orientation
+     * the phone is actually held in. A segment that is in flight has to be finalized first — see
+     * the callers, which pause the loop (or only call this while nothing is recording).
+     */
+    private fun rebindForRotation() {
+        if (!::cameraController.isInitialized || !cameraController.isBound) {
+            // No session to rebuild (still starting / already released): leave the loop as it is.
+            rebindingForRotation = false
+            if (isRecording) recordingController.resume()
+            return
+        }
+        rebindingForRotation = true
+        val rebound = runCatching { cameraController.rebind() }.getOrDefault(false)
+        if (rebound) return
+        // Nothing is bound any more after a failed bind, so there is no capture to resume on.
+        rebindingForRotation = false
+        Log.w(TAG, "Rotation rebind failed; ending the segment loop")
+        if (isRecording) recordingController.stop()
         // On success the new capture arrives through cameraController.onReady -> resume().
     }
 
@@ -376,23 +461,29 @@ class RecordingService : Service(), LifecycleOwner {
                 recordingController.attach(capture)
                 uiListener?.onCameraReady(preview, isFrontCamera)
                 uiListener?.onLensChanged(isFrontCamera)
-                if (switchingCamera) {
-                    // Camera switch while recording: continue the loop on the new lens.
-                    switchingCamera = false
-                    if (isRecording) recordingController.resume()
-                } else if (wantRecording) {
-                    startSegmentsIfNeeded()
+                when {
+                    // This bind was a lens switch and/or a rotation rebind: continue the loop on
+                    // the new session, or start it when the recording had not begun yet.
+                    switchingCamera || rebindingForRotation -> {
+                        switchingCamera = false
+                        rebindingForRotation = false
+                        if (isRecording) recordingController.resume() else startSegmentsIfNeeded()
+                    }
+                    wantRecording -> startSegmentsIfNeeded()
                 }
             }
             onError = { message ->
-                if (switchingCamera) {
-                    switchingCamera = false
-                    if (isRecording) recordingController.resume()
-                }
+                switchingCamera = false
+                rebindingForRotation = false
                 uiListener?.onError(message)
+                // A failed bind leaves no capture: stop instead of recording into nothing.
+                if (isRecording && !cameraController.isBound) recordingController.stop()
             }
             onLensChanged = { isFront -> uiListener?.onLensChanged(isFront) }
         }
+        // The bind runs as soon as the provider is ready and bakes this rotation into the
+        // Recorder; give it what we know now instead of CameraX's ROTATION_0 default.
+        cameraController.setTargetRotation(targetRotation)
         speedTracker = SpeedTracker(this) { kmh -> speedKmh = kmh }
         speedTracker.start()
 
@@ -401,6 +492,12 @@ class RecordingService : Service(), LifecycleOwner {
 
     private fun startSegmentsIfNeeded() {
         if (!wantRecording || recordingController.isRecording) return
+        // A Recorder that was bound for another orientation keeps writing that orientation, so the
+        // session is rebuilt first; onReady then comes back here with the fresh capture.
+        if (cameraController.isBound && cameraController.boundRotation != targetRotation) {
+            rebindForRotation()
+            return
+        }
         recordingController.start()
     }
 
@@ -422,7 +519,11 @@ class RecordingService : Service(), LifecycleOwner {
         }
 
         override fun onPausedForSwitch() {
-            rebindForSwitch()
+            when {
+                switchingCamera -> rebindForSwitch()
+                rebindingForRotation -> rebindForRotation()
+                else -> if (isRecording) recordingController.resume()
+            }
         }
 
         override fun onSegmentLocked() {
@@ -439,6 +540,8 @@ class RecordingService : Service(), LifecycleOwner {
     private fun finishSession() {
         cancelOrientationRestart()
         wantRecording = false
+        switchingCamera = false
+        rebindingForRotation = false
         releaseWakeLock()
         if (inForeground) {
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
@@ -581,11 +684,18 @@ class RecordingService : Service(), LifecycleOwner {
     private fun hasPermission(permission: String): Boolean =
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
+    /** Rotation of the default display, or ROTATION_0 when it cannot be read. */
+    private fun currentDisplayRotation(): Int {
+        val displayManager = getSystemService(DisplayManager::class.java) ?: return Surface.ROTATION_0
+        val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY) ?: return Surface.ROTATION_0
+        return runCatching { display.rotation }.getOrDefault(Surface.ROTATION_0)
+    }
+
     companion object {
         private const val TAG = "RecordingService"
 
         /** Degrees the phone may sit away from a quadrant before that quadrant counts. */
-        private const val ORIENTATION_TOLERANCE_DEGREES = 25
+        private const val ORIENTATION_TOLERANCE_DEGREES = 35
 
         /**
          * How long a new orientation has to hold before the running segment is split for it.

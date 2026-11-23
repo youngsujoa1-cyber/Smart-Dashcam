@@ -44,7 +44,10 @@ class RecordingController(
         fun onSegmentLocked()
         fun onError(message: String)
 
-        /** The loop is paused (current segment finalized) and waits for [RecordingController.resume]. */
+        /**
+         * The loop is paused (current segment finalized) and waits for [RecordingController.resume].
+         * Fired for a lens switch and for a rotation rebind alike.
+         */
         fun onPausedForSwitch()
     }
 
@@ -64,15 +67,23 @@ class RecordingController(
     private var active = false
     private var paused = false
 
+    /** A finalized segment is still being copied into the gallery (the capture is free meanwhile). */
+    private var publishing = false
+
     /** Rotation the running segment was started with; null while nothing is running. */
     var currentSegmentRotation: Int? = null
         private set
 
-    /** A rotation split was requested and its segment is still finalizing. */
-    private var orientationRestartPending = false
-
     val isRecording: Boolean
         get() = active
+
+    /**
+     * True while a segment still holds the [VideoCapture] — recording, or waiting for its Finalize
+     * to be published. Unbinding the use cases during that window can end the file with an error,
+     * so whoever wants to rebind the camera waits until this is false.
+     */
+    val isCaptureIdle: Boolean
+        get() = recording == null && !publishing
 
     /** True while the current segment will be saved as a locked clip. */
     val isCurrentSegmentLocked: Boolean
@@ -97,23 +108,29 @@ class RecordingController(
 
     /**
      * Stops recording the running segment (it is published normally) and holds the loop until
-     * [resume] is called. Used when the camera has to be rebound, e.g. a front/rear switch
-     * while recording: the session, its timer and the foreground service all stay alive.
+     * [resume] is called. Used when the camera has to be rebound, e.g. a front/rear switch or a
+     * rotation change while recording: the session, its timer and the foreground service all
+     * stay alive.
      */
-    fun pauseForCameraSwitch() {
+    fun pauseForRebind() {
         if (!active || paused) return
         paused = true
         mainHandler.removeCallbacks(rotateRunnable)
         val current = recording
         if (current == null) {
-            listener?.onPausedForSwitch()
+            // Nothing is recording: either the loop sits between segments, or a finalized segment is
+            // still being published — continueOrFinish() reports onPausedForSwitch() when it is done.
+            if (!publishing) listener?.onPausedForSwitch()
         } else {
             // Finalize publishes the segment and then reports onPausedForSwitch().
             runCatching { current.stop() }
         }
     }
 
-    /** Continues the loop with the currently attached capture after a [pauseForCameraSwitch]. */
+    /** Alias kept for the lens switch path; both reasons finalize the segment the same way. */
+    fun pauseForCameraSwitch() = pauseForRebind()
+
+    /** Continues the loop with the currently attached capture after a [pauseForRebind]. */
     fun resume() {
         if (!active || !paused) return
         paused = false
@@ -135,16 +152,15 @@ class RecordingController(
      * like the segment timer does. The session itself is untouched: [paused] does not change,
      * the timer keeps running and the foreground service stays alive.
      *
-     * Safe to call repeatedly or while a segment is finalizing: it does nothing when no segment
-     * is running, when the loop is paused for a camera switch, when the requested rotation is
-     * already the running segment's, or when a split is already on its way.
+     * Kept for a plain split that does not rebuild the camera session. The service no longer uses
+     * it for a rotation: a [VideoCapture] that is only re-targeted keeps the encoder orientation
+     * it was bound with on some devices, so the owner finalizes the segment and rebuilds the
+     * session instead ([pauseForRebind]).
      */
     fun rotateForOrientation() {
         if (!active || paused) return
-        if (orientationRestartPending) return
         if (recording == null) return
         if (currentSegmentRotation == rotationProvider()) return
-        orientationRestartPending = true
         // Finalize publishes the segment; continueOrFinish() then starts the next one.
         runCatching { recording?.stop() }
     }
@@ -195,10 +211,10 @@ class RecordingController(
         currentFile = file
         currentSegmentLocked = false
         segmentIndex += 1
-        orientationRestartPending = false
 
-        // Each segment follows the current device orientation, so rotating the phone
-        // between segments (or through rotateForOrientation) gives oriented footage.
+        // Each segment follows the current device orientation. The rotation that matters is
+        // already baked into the [VideoCapture] when the session was bound; this only keeps a
+        // re-targeted session in step.
         val rotation = rotationProvider()
         currentSegmentRotation = rotation
         runCatching { capture.targetRotation = rotation }
@@ -258,18 +274,34 @@ class RecordingController(
         }
 
         val recordedAt = parseRecordedAt(finishedFile)
+        publishing = true
         try {
             ioExecutor.execute {
-                val clip = clipStorage.publishSegmentBlocking(finishedFile, wasLocked, recordedAt)
-                clipStorage.enforceLimitBlocking(settings.storageLimitBytes)
-                mainHandler.post {
-                    listener?.onSegmentSaved(clip)
-                    continueOrFinish()
+                runCatching {
+                    val clip = clipStorage.publishSegmentBlocking(finishedFile, wasLocked, recordedAt)
+                    clipStorage.enforceLimitBlocking(settings.storageLimitBytes)
+                    clip
+                }.onSuccess { clip ->
+                    mainHandler.post {
+                        publishing = false
+                        listener?.onSegmentSaved(clip)
+                        continueOrFinish()
+                    }
+                }.onFailure { t ->
+                    // The copy into the gallery failed: drop the temp file and keep the loop alive.
+                    Log.w(TAG, "Publishing the segment failed", t)
+                    finishedFile.delete()
+                    mainHandler.post {
+                        publishing = false
+                        listener?.onSegmentSaved(null)
+                        continueOrFinish()
+                    }
                 }
             }
         } catch (t: Throwable) {
             // Executor was shut down (activity destroyed) — just drop the temp file.
             Log.w(TAG, "Publisher unavailable", t)
+            publishing = false
             finishedFile.delete()
         }
     }
@@ -281,7 +313,7 @@ class RecordingController(
             return
         }
         if (paused) {
-            // Camera switch in progress: wait for resume().
+            // A lens switch / rotation rebind is in progress: wait for resume().
             listener?.onPausedForSwitch()
             return
         }

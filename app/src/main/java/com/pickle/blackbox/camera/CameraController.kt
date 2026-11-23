@@ -70,6 +70,14 @@ class CameraController(
     val isBound: Boolean
         get() = videoCapture != null
 
+    /**
+     * The rotation the currently bound use cases were built with, -1 while nothing is bound.
+     * A value different from the wanted rotation means the session has to be rebuilt before the
+     * next segment can record in the new orientation.
+     */
+    var boundRotation: Int = -1
+        private set
+
     fun start() {
         if (started) return
         started = true
@@ -122,6 +130,10 @@ class CameraController(
      * during a session, an error retry — builds its [VideoCapture] with this rotation instead
      * of CameraX's default [Surface.ROTATION_0]. Missing this was what made the front camera
      * record 9:16 after a lens switch while the rear camera recorded 16:9.
+     *
+     * Setting the rotation only redirects the running session; the recorder keeps the encoder
+     * orientation it was bound with (see [rebind]). Whoever owns the recording must therefore
+     * rebuild the session once the running segment is finalized.
      */
     fun setTargetRotation(rotation: Int) {
         if (rotation == targetRotation) return
@@ -130,6 +142,26 @@ class CameraController(
             .onFailure { Log.w(TAG, "Could not update the preview rotation", it) }
         runCatching { videoCapture?.targetRotation = rotation }
             .onFailure { Log.w(TAG, "Could not update the video rotation", it) }
+    }
+
+    /**
+     * Rebuilds both use cases — a fresh [Recorder], a fresh [VideoCapture] and a fresh [Preview],
+     * all built with the current [targetRotation].
+     *
+     * CameraX 1.4.1 on Samsung devices does not carry a later `targetRotation` change into an
+     * already bound [Recorder]: the encoder surface and the orientation metadata written into
+     * the MP4 keep the rotation the session was bound with (ROTATION_0 at service start). That is
+     * why the front camera still saved 9:16 portrait footage while the phone lay in landscape,
+     * even though `VideoCapture.targetRotation` had been set to ROTATION_90. Only rebuilding the
+     * session gives the next segment the new orientation.
+     *
+     * The caller must not have a segment in flight: finalize it first, then rebind, then resume.
+     * @return true when a new session was bound.
+     */
+    fun rebind(): Boolean {
+        if (cameraProvider == null) return false
+        bindUseCases()
+        return videoCapture != null
     }
 
     /** Switches front <-> back and rebinds. Returns false when the target lens is missing. */
@@ -149,6 +181,7 @@ class CameraController(
         releaseDummyProvider()
         preview = null
         videoCapture = null
+        boundRotation = -1
     }
 
     private fun selectorFor(front: Boolean): CameraSelector =
@@ -193,12 +226,14 @@ class CameraController(
             provider.bindToLifecycle(lifecycleOwner, selector, previewUseCase, capture)
             preview = previewUseCase
             videoCapture = capture
+            boundRotation = targetRotation
             onReady?.invoke(previewUseCase, capture)
             onLensChanged?.invoke(isFrontCamera)
         } catch (t: Throwable) {
             Log.e(TAG, "Binding use cases failed", t)
             preview = null
             videoCapture = null
+            boundRotation = -1
             onError?.invoke("카메라 화면을 표시할 수 없습니다: " + (t.message ?: "알 수 없는 오류"))
         }
     }
