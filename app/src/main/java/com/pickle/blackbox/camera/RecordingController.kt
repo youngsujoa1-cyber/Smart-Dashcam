@@ -64,6 +64,13 @@ class RecordingController(
     private var active = false
     private var paused = false
 
+    /** Rotation the running segment was started with; null while nothing is running. */
+    var currentSegmentRotation: Int? = null
+        private set
+
+    /** A rotation split was requested and its segment is still finalizing. */
+    private var orientationRestartPending = false
+
     val isRecording: Boolean
         get() = active
 
@@ -113,10 +120,33 @@ class RecordingController(
         val capture = videoCapture
         if (capture == null) {
             active = false
+            currentSegmentRotation = null
             listener?.onRecordingStopped()
             return
         }
         startSegment(capture)
+    }
+
+    /**
+     * Splits the running segment because the phone was turned while recording.
+     *
+     * The current segment is finalized and published in the orientation it was recorded in,
+     * and the loop immediately starts the next one with the current [rotationProvider], exactly
+     * like the segment timer does. The session itself is untouched: [paused] does not change,
+     * the timer keeps running and the foreground service stays alive.
+     *
+     * Safe to call repeatedly or while a segment is finalizing: it does nothing when no segment
+     * is running, when the loop is paused for a camera switch, when the requested rotation is
+     * already the running segment's, or when a split is already on its way.
+     */
+    fun rotateForOrientation() {
+        if (!active || paused) return
+        if (orientationRestartPending) return
+        if (recording == null) return
+        if (currentSegmentRotation == rotationProvider()) return
+        orientationRestartPending = true
+        // Finalize publishes the segment; continueOrFinish() then starts the next one.
+        runCatching { recording?.stop() }
     }
 
     fun stop() {
@@ -151,6 +181,7 @@ class RecordingController(
         mainHandler.removeCallbacks(rotateRunnable)
         val current = recording
         recording = null
+        currentSegmentRotation = null
         if (current != null) {
             // Let CameraX finalize so the last segment is still published.
             runCatching { current.stop() }
@@ -164,10 +195,13 @@ class RecordingController(
         currentFile = file
         currentSegmentLocked = false
         segmentIndex += 1
+        orientationRestartPending = false
 
-        // Each segment follows the current screen orientation, so rotating the phone
-        // between segments gives correctly oriented footage.
-        runCatching { capture.targetRotation = rotationProvider() }
+        // Each segment follows the current device orientation, so rotating the phone
+        // between segments (or through rotateForOrientation) gives oriented footage.
+        val rotation = rotationProvider()
+        currentSegmentRotation = rotation
+        runCatching { capture.targetRotation = rotation }
 
         val outputOptions = FileOutputOptions.Builder(file).build()
         var pending: PendingRecording = capture.output.prepareRecording(context, outputOptions)
@@ -181,6 +215,7 @@ class RecordingController(
             Log.e(TAG, "Could not start recording", t)
             active = false
             recording = null
+            currentSegmentRotation = null
             listener?.onError("녹화를 시작할 수 없습니다: " + (t.message ?: "알 수 없는 오류"))
             return
         }
@@ -202,6 +237,7 @@ class RecordingController(
 
         mainHandler.removeCallbacks(rotateRunnable)
         recording = null
+        currentSegmentRotation = null
         val finishedFile = currentFile
         currentFile = null
         val wasLocked = currentSegmentLocked
@@ -240,6 +276,7 @@ class RecordingController(
 
     private fun continueOrFinish() {
         if (!active) {
+            currentSegmentRotation = null
             listener?.onRecordingStopped()
             return
         }
@@ -251,6 +288,7 @@ class RecordingController(
         val capture = videoCapture
         if (capture == null) {
             active = false
+            currentSegmentRotation = null
             listener?.onRecordingStopped()
             return
         }

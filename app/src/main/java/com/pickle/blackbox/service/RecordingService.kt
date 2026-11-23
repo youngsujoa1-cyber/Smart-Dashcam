@@ -96,6 +96,9 @@ class RecordingService : Service(), LifecycleOwner {
     /** Rotation the phone is really held in, from the accelerometer; null while unknown/flat. */
     private var sensorRotation: Int? = null
 
+    /** Last raw angle reported by the accelerometer, kept even when it fits no quadrant. */
+    private var lastOrientationDegrees: Int? = null
+
     /** Rotation every capture actually uses ([sensorRotation] when known, else [displayRotation]). */
     private var targetRotation: Int = Surface.ROTATION_0
 
@@ -157,6 +160,7 @@ class RecordingService : Service(), LifecycleOwner {
 
     override fun onDestroy() {
         disableOrientationTracking()
+        cancelOrientationRestart()
         mainHandler.removeCallbacksAndMessages(null)
         if (::speedTracker.isInitialized) speedTracker.stop()
         if (::recordingController.isInitialized) recordingController.release()
@@ -196,10 +200,14 @@ class RecordingService : Service(), LifecycleOwner {
         ensureForeground(getString(R.string.notification_preparing))
         acquireWakeLock()
         wantRecording = true
+        cancelOrientationRestart()
+        // A phone that is already lying sideways must record landscape from second 0.
+        refreshOrientationNow()
         if (cameraReady) startSegmentsIfNeeded()
     }
 
     fun stopRecording() {
+        cancelOrientationRestart()
         wantRecording = false
         if (isRecording) {
             recordingController.stop()
@@ -229,6 +237,48 @@ class RecordingService : Service(), LifecycleOwner {
         if (rotation == targetRotation) return
         targetRotation = rotation
         if (::cameraController.isInitialized) cameraController.setTargetRotation(rotation)
+        // Turning the phone in the middle of a segment splits it after a short debounce, so the
+        // footage keeps the orientation it actually had (instead of staying portrait for the
+        // whole 3-5 minute segment). Not while a camera switch is rebinding the session.
+        if (isRecording && !switchingCamera) scheduleOrientationRestart()
+    }
+
+    /**
+     * Applies the rotation the phone is held in right now.
+     *
+     * The accelerometer callback may not have arrived yet when recording starts (or the phone
+     * was lying at an angle that fits no quadrant), so the last raw angle is mapped here as
+     * well: if the phone is already horizontal, the very first segment is recorded horizontal.
+     */
+    private fun refreshOrientationNow() {
+        if (sensorRotation == null) {
+            val degrees = lastOrientationDegrees
+            if (degrees != null) rotationForOrientation(degrees)?.let { sensorRotation = it }
+        }
+        applyEffectiveRotation()
+    }
+
+    // ------------------------------------------------------ rotation segment split
+
+    /**
+     * Schedules a segment split for the new orientation. A rotation that only passes through
+     * (the phone is tilted and put back) is absorbed: every new change restarts the timer, and
+     * the split is skipped when the running segment already has the target orientation.
+     */
+    private fun scheduleOrientationRestart() {
+        mainHandler.removeCallbacks(orientationRestart)
+        mainHandler.postDelayed(orientationRestart, ORIENTATION_RESTART_DEBOUNCE_MS)
+    }
+
+    private fun cancelOrientationRestart() {
+        mainHandler.removeCallbacks(orientationRestart)
+    }
+
+    private val orientationRestart = Runnable {
+        if (!isRecording || switchingCamera) return@Runnable
+        // Tilting back within the debounce window leaves the running segment alone.
+        if (recordingController.currentSegmentRotation == targetRotation) return@Runnable
+        recordingController.rotateForOrientation()
     }
 
     // ----------------------------------------------------- device orientation
@@ -255,13 +305,14 @@ class RecordingService : Service(), LifecycleOwner {
         object : OrientationEventListener(this) {
             override fun onOrientationChanged(orientation: Int) {
                 if (orientation == ORIENTATION_UNKNOWN) return
+                lastOrientationDegrees = orientation
                 // Only act when the phone is clearly inside one quadrant (±25°), so a phone
                 // lying at an odd angle keeps the last good rotation instead of flickering.
                 val rotation = rotationForOrientation(orientation) ?: return
                 if (rotation == sensorRotation) return
                 sensorRotation = rotation
                 applyEffectiveRotation()
-                // A running segment keeps its orientation until the segment timer rotates it.
+                // A running segment is split after the debounce and continues in this rotation.
             }
         }
     }
@@ -386,6 +437,7 @@ class RecordingService : Service(), LifecycleOwner {
 
     /** Called once a recording session has really ended (after the last segment was saved). */
     private fun finishSession() {
+        cancelOrientationRestart()
         wantRecording = false
         releaseWakeLock()
         if (inForeground) {
@@ -534,6 +586,12 @@ class RecordingService : Service(), LifecycleOwner {
 
         /** Degrees the phone may sit away from a quadrant before that quadrant counts. */
         private const val ORIENTATION_TOLERANCE_DEGREES = 25
+
+        /**
+         * How long a new orientation has to hold before the running segment is split for it.
+         * Absorbs the angles of turning the phone and tilting it back in one motion.
+         */
+        private const val ORIENTATION_RESTART_DEBOUNCE_MS = 1_200L
 
         /**
          * Maps [OrientationEventListener] degrees to `Surface.ROTATION_*`.

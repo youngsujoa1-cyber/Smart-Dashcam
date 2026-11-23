@@ -7,7 +7,7 @@ Gradle Kotlin DSL 프로젝트로 바로 빌드할 수 있는 상태입니다.
 | 항목 | 값 |
 | --- | --- |
 | 앱 이름 | RoadEyeCam (`com.pickle.blackbox`) |
-| 버전 | 1.2.4 (versionCode 8) |
+| 버전 | 1.2.5 (versionCode 9) |
 | 플랫폼 | Android (Kotlin) |
 | minSdk / targetSdk / compileSdk | 26 / 35 / 35 |
 | AGP / Gradle / Kotlin | 8.7.3 / 8.9 / 2.0.21 |
@@ -56,6 +56,12 @@ Gradle Kotlin DSL 프로젝트로 바로 빌드할 수 있는 상태입니다.
   세로 고정 앱이 앞에 있으면 `Display.rotation` 이 세로(`ROTATION_0`)로 남아 영상이 세로로 저장될 수 있어,
   `RecordingService` 가 **`OrientationEventListener`(가속도 센서)** 로 기기 각도를 읽어 `ROTATION_0/90/180/270`
   으로 매핑합니다(±25° 이내일 때만 반영, 평평할 때는 마지막 값 유지). 센서를 쓸 수 없을 때만 화면 회전을 씁니다.
+- **녹화를 시작하는 순간 기기가 이미 가로이면 첫 구간부터 가로입니다.** `beginRecording()` 이 마지막 센서 각도를
+  즉시 적용(`refreshOrientationNow()`)하므로, 센서 콜백이 아직 오지 않았거나 애매한 각도였어도 처음부터 맞게 찍힙니다.
+- **녹화 중에 기기를 돌리면 그 시점에서 구간을 끊고 새 방향으로 이어서 찍습니다 (1.2.5).** 방향이 바뀐 뒤
+  **1.2초** 유지되면 현재 구간을 마감·저장하고 곧바로 새 방향 구간을 시작합니다(`RecordingService` 디바운스
+  `ORIENTATION_RESTART_DEBOUNCE_MS = 1200` → `RecordingController.rotateForOrientation()`). 1.2초 안에 원래 방향으로
+  되돌리면 구간을 쪼개지 않고, 새 구간은 항상 시작 시점의 방향으로 찍힙니다. 세션(타이머·상시 알림)은 끊기지 않습니다.
 - **전면/후면 어느 렌즈든 가로 녹화가 됩니다.** (1.2.4 에서 `VideoCapture` 를 만들 때 `setTargetRotation` 을
   넘기고, 렌즈 전환 시에도 방향이 유지되도록 수정 — 이전에는 전면으로 바꾸면 9:16 세로로 저장됐습니다.)
 - **가로 화면에서 녹화 중일 때는 하단 광고 배너를 자동으로 숨깁니다.** 배너가 미리보기와 조작 버튼을
@@ -186,7 +192,7 @@ MobileAds.setRequestConfiguration(
    ```
    `*.jks` 는 `.gitignore` 로 커밋되지 않습니다. 분실하면 업데이트가 불가능합니다.
 2. **`app/build.gradle.kts` 의 release 서명 설정** (`TODO(PlayStore)` 부분) + `keystore.properties`(gitignore 대상)
-3. `versionCode` / `versionName` 증가 (현재 8 / 1.2.4)
+3. `versionCode` / `versionName` 증가 (현재 9 / 1.2.5)
 4. **AAB 빌드** → `./gradlew bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`
 5. **Play Console**
    - 앱 콘텐츠: 카메라·마이크·위치·알림 권한 사용 목적 설명
@@ -300,7 +306,8 @@ blackbox-app/
 
 ## 9. 알려진 제한과 다음 단계
 
-- **녹화 중 회전**: 이미 녹화 중인 구간은 시작 당시 방향을 유지하고, 회전 이후 시작되는 다음 구간부터 새 방향이 적용됩니다.
+- **녹화 중 회전**: 방향이 1.2초 이상 유지되면 그 시점에서 구간을 끊고 새 방향으로 이어서 찍습니다(1.2.5).
+  짧게 흔들었다 원래대로 돌리면 구간은 그대로 이어집니다. 구간이 끊기는 순간에 짧은 공백(수백 ms)이 생깁니다.
 - **녹화 중 카메라 전환**: 현재 구간을 마감하고 새 구간으로 이어지므로, 전환 순간에 짧은 공백(수백 ms)이 생깁니다.
 - **배터리/발열**: 화면이 켜져 있으면 `keepScreenOn` 으로 화면을 유지하고, 녹화 중에는 `PARTIAL_WAKE_LOCK` 을 잡습니다. 장시간 주차 녹화에는 전원 연결을 권장합니다.
 - **안드로이드 14+ 백그라운드 시작 제한**: 서비스는 항상 앱이 화면에 있을 때 시작되며, 시스템이 강제로 종료하면 자동 재시작하지 않습니다(`START_NOT_STICKY`).
@@ -321,6 +328,7 @@ blackbox-app/
 | 광고가 안 뜸 | 인터넷 연결, 테스트 ID는 즉시 채워짐(빈 화면이면 SDK 초기화 로그 확인) |
 | 백그라운드 녹화 영상이 정지 화면 | 1.2.3 에서 오프스크린 프리뷰 서피스 + `PARTIAL_WAKE_LOCK` 으로 수정. 최신 APK 설치 후 확인 |
 | 전면 카메라 영상이 세로(9:16)로 저장 | 1.2.4 에서 `VideoCapture.setTargetRotation(빌드 시점 적용)` + `OrientationEventListener` 로 수정. 최신 APK 설치 후 확인 |
+| 녹화 중 폰을 돌렸는데 영상이 계속 세로 | 1.2.5 에서 방향 변경 후 1.2초 뒤 구간 분할(`rotateForOrientation()`)로 수정. 설치된 APK 가 1.2.5 인지 확인 |
 | 앱 언어가 바뀌지 않음 | 설정 → 앱 언어에서 다시 선택(즉시 적용) |
 
 ---
