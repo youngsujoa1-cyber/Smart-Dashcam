@@ -48,8 +48,8 @@ import kotlin.math.roundToInt
  * picture stays clean and cheap while the saved footage carries the stamp.
  *
  * The effect needs nothing from Google's `camera-effects` artifact (which is not available in
- * this offline build); the renderer is a small EGL 2.0 / GLES20 [SurfaceProcessor], so it also
- * costs one extra GPU copy less than a whole overlay library.
+ * this offline build); the renderer is a small EGL 2.0 / GLES20 [SurfaceProcessor] of its own,
+ * with a fixed shader pair and a single extra draw call per frame.
  *
  * Creation and every call into the processor happen on one private GL thread
  * ([TimestampWatermarkProcessor.executor]); [close] frees the EGL surface, the context, the GL
