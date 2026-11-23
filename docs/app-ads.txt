@@ -1,12 +1,1 @@
-# app-ads.txt — AdMob authorized sellers template
-#
-# 1. Replace pub-0000000000000000 with your own AdMob publisher ID
-#    (the part after "ca-app-pub-" and before the "~" in your App ID).
-# 2. Host this file at the ROOT of the developer website you declared on your
-#    Google Play listing:  https://your-domain.com/app-ads.txt
-# 3. It must be plain text, served over HTTPS, with no redirects.
-# 4. Verify it in the AdMob console (Apps > app-ads.txt); propagation can take up to 24h.
-#
-# Line format:
-#   <ad network domain>, <publisher account ID>, <relationship>, <certification authority ID>
-google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0
+google.com, pub-4832055633016363, DIRECT, f08c47fec0942fa0
