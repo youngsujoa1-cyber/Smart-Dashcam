@@ -41,7 +41,7 @@ import com.pickle.blackbox.ui.MainActivity
  * lifecycle instead of an activity, so recording keeps going when the user presses
  * Home, switches apps or turns the screen off, and continues when the activity comes
  * back. While recording, the service is a started foreground service with an ongoing
- * notification ("spyblackbox 녹화 중"); without a client and without a recording it
+ * notification ("RoadEye 녹화 중"); without a client and without a recording it
  * shuts itself down and releases the camera.
  */
 class RecordingService : Service(), LifecycleOwner {

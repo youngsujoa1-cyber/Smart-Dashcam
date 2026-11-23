@@ -67,7 +67,7 @@
     <!-- Background recording notification -->
     <string name="notification_channel_name">録画通知</string>
     <string name="notification_channel_description">バックグラウンド録画の状態を表示します。</string>
-    <string name="notification_title">spyblackbox 録画中</string>
+    <string name="notification_title">RoadEye 録画中</string>
     <string name="notification_text">画面を消しても録画は続きます</string>
     <string name="notification_text_locked">現在の区間はロックされています</string>
     <string name="notification_preparing">録画の準備中…</string>

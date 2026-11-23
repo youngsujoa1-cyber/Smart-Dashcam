@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">spyblackbox</string>
+    <string name="app_name" translatable="false">RoadEye</string>
 
     <!-- Main screen HUD -->
     <string name="hud_idle">대기 중</string>
@@ -69,7 +69,7 @@
     <!-- Background recording notification -->
     <string name="notification_channel_name">녹화 알림</string>
     <string name="notification_channel_description">백그라운드 녹화 상태를 표시합니다.</string>
-    <string name="notification_title">spyblackbox 녹화 중</string>
+    <string name="notification_title">RoadEye 녹화 중</string>
     <string name="notification_text">화면을 꺼도 녹화가 계속됩니다</string>
     <string name="notification_text_locked">현재 구간이 잠겨 있습니다</string>
     <string name="notification_preparing">녹화를 준비하는 중…</string>
