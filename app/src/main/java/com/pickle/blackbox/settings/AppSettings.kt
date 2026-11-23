@@ -33,6 +33,14 @@ class AppSettings(context: Context) {
         get() = prefs.getBoolean(KEY_SHOW_SPEED, true)
         set(value) = prefs.edit { putBoolean(KEY_SHOW_SPEED, value) }
 
+    /**
+     * 녹화 방향. false = 자동 (follow how the phone is really held), true = 가로 고정
+     * (always record 16:9 landscape, whatever way the phone is held or the app was started).
+     */
+    var landscapeLocked: Boolean
+        get() = prefs.getBoolean(KEY_LANDSCAPE_LOCKED, DEFAULT_LANDSCAPE_LOCKED)
+        set(value) = prefs.edit { putBoolean(KEY_LANDSCAPE_LOCKED, value) }
+
     /** BCP-47 language tag chosen in the app ("" = follow the system language). */
     var languageTag: String
         get() = prefs.getString(KEY_LANGUAGE_TAG, "") ?: ""
@@ -60,10 +68,14 @@ class AppSettings(context: Context) {
         private const val KEY_STORAGE_LIMIT_GB = "storage_limit_gb"
         private const val KEY_RECORD_AUDIO = "record_audio"
         private const val KEY_SHOW_SPEED = "show_speed"
+        private const val KEY_LANDSCAPE_LOCKED = "landscape_locked"
         private const val KEY_LANGUAGE_TAG = "language_tag"
         private const val KEY_HAS_SELECTED_LANGUAGE = "has_selected_language"
 
         const val DEFAULT_SEGMENT_MINUTES = 3
         const val DEFAULT_STORAGE_LIMIT_GB = 2
+
+        /** 녹화 방향 default: 자동. */
+        const val DEFAULT_LANDSCAPE_LOCKED = false
     }
 }

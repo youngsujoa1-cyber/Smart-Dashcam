@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.hardware.display.DisplayManager
 import android.os.Binder
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -98,6 +99,22 @@ class RecordingService : Service(), LifecycleOwner {
     /** Rotation reported by the screen the activity is on (stale when auto-rotate is off). */
     private var displayRotation: Int = Surface.ROTATION_0
 
+    /**
+     * True while the display, which is lying in landscape, is trusted over a sensor reading
+     * that still says portrait. Only a display that turned landscape grants this (see
+     * [updateDisplayRotation]); it is dropped as soon as the display goes back to portrait.
+     */
+    private var trustDisplayLandscape: Boolean = false
+
+    /** Landscape direction used by the 가로 고정 mode ([Surface.ROTATION_90] / [Surface.ROTATION_270]). */
+    private var landscapeSide: Int = Surface.ROTATION_90
+
+    /**
+     * True only while the 녹화 방향 setting is being applied from the settings dialog. That is a
+     * deliberate act, so it may split the running segment even in 가로 고정 mode.
+     */
+    private var orientationChangeIsExplicit: Boolean = false
+
     /** Rotation the phone is really held in, from the accelerometer; null while unknown/flat. */
     private var sensorRotation: Int? = null
 
@@ -135,18 +152,20 @@ class RecordingService : Service(), LifecycleOwner {
         super.onCreate()
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
 
-        // Start from what the screen says instead of the ROTATION_0 default: the very first
-        // bindUseCases() bakes this rotation into the Recorder, and a portrait session at
-        // service start was exactly what kept the footage vertical. The accelerometer value
-        // overrides it as soon as it fits a quadrant.
-        displayRotation = currentDisplayRotation()
-        targetRotation = displayRotation
-
         val app = application as BlackboxApp
         settings = app.settings
         clipStorage = app.clipStorage
 
+        // Start from what the screen says instead of the ROTATION_0 default: the very first
+        // bindUseCases() bakes this rotation into the Recorder, and a portrait session at
+        // service start was exactly what kept the footage vertical. The accelerometer value
+        // overrides it as soon as it fits a quadrant, and 가로 고정 starts landscape at once.
+        displayRotation = currentDisplayRotation()
+        trustDisplayLandscape = isLandscape(displayRotation)
+        targetRotation = effectiveRotation()
+
         createNotificationChannel()
+        registerDisplayTracking()
         ensureCamera()
         enableOrientationTracking()
     }
@@ -171,6 +190,7 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     override fun onDestroy() {
+        unregisterDisplayTracking()
         disableOrientationTracking()
         cancelOrientationRestart()
         mainHandler.removeCallbacksAndMessages(null)
@@ -234,20 +254,33 @@ class RecordingService : Service(), LifecycleOwner {
     fun lockCurrentSegment(): Boolean = isRecording && recordingController.lockCurrentSegment()
 
     /**
-     * Reports the rotation of the screen (from `Display.rotation`). It is only the fallback:
-     * while the phone is mounted in a car the screen is often locked to portrait (auto-rotate
-     * off) or the display rotation is simply stale, so the sensor value from
-     * [enableOrientationTracking] wins whenever it is available.
+     * Reports the rotation of the screen (from `Display.rotation`), sent by the activity.
+     * The service also follows the display on its own through [registerDisplayTracking], so this
+     * is only what the attached screen sees; both paths land in [updateDisplayRotation].
      */
-    fun setDisplayRotation(rotation: Int) {
+    fun setDisplayRotation(rotation: Int) = updateDisplayRotation(rotation)
+
+    /**
+     * Adopts a new display rotation.
+     *
+     * The sensor value from [enableOrientationTracking] normally wins, because the display is
+     * often locked to portrait (auto-rotate off) or stale while the phone really lies sideways.
+     * A display that *turns* landscape is the exception: auto-rotate, or a navigation app that
+     * rotated the screen itself, says more than a sensor reading that is still portrait (a
+     * steeply tilted car mount, or a callback that has not come yet). That reading is therefore
+     * trusted until the display leaves landscape again, while a display locked at ROTATION_0
+     * never overrides the sensor — the phone turned in a portrait mount still records landscape.
+     */
+    private fun updateDisplayRotation(rotation: Int) {
         if (rotation == displayRotation) return
         displayRotation = rotation
+        trustDisplayLandscape = isLandscape(rotation)
         applyEffectiveRotation()
     }
 
     /** Keeps the captured video oriented the same way as the phone is really held. */
     private fun applyEffectiveRotation() {
-        val rotation = sensorRotation ?: displayRotation
+        val rotation = effectiveRotation()
         if (rotation == targetRotation) return
         targetRotation = rotation
         if (!::cameraController.isInitialized) return
@@ -267,6 +300,10 @@ class RecordingService : Service(), LifecycleOwner {
             // Turning the phone in the middle of a segment splits it after a short debounce, so the
             // footage keeps the orientation it actually had (instead of staying portrait for the
             // whole 3-5 minute segment). The split is followed by a rebind.
+            // In 가로 고정 mode the orientation is pinned, so a reading from the sensor changes
+            // nothing the user asked for: the segment is never split for it and the loop keeps
+            // splitting only on the chosen 3/5 minute length.
+            if (settings.landscapeLocked && !orientationChangeIsExplicit) return
             scheduleOrientationRestart()
             return
         }
@@ -274,6 +311,53 @@ class RecordingService : Service(), LifecycleOwner {
             // Nothing is recording: rebuild now, so the next segment starts on a Recorder that was
             // created with the new rotation instead of the one from service start.
             rebindForRotation()
+        }
+    }
+
+    /**
+     * Rotation the next segment is recorded in.
+     *
+     * With 녹화 방향 = 가로 고정 it is always one of the two landscape rotations, so the footage is
+     * 16:9 whether the phone is held upright, laid in a landscape mount, or the app was started
+     * in portrait. Otherwise the sensor wins, with a display that turned landscape beating a
+     * portrait sensor reading (see [updateDisplayRotation]).
+     */
+    private fun effectiveRotation(): Int {
+        if (settings.landscapeLocked) return landscapeRotation()
+        val sensor = sensorRotation ?: return displayRotation
+        if (isLandscape(displayRotation) && isPortrait(sensor) && trustDisplayLandscape) {
+            return displayRotation
+        }
+        return sensor
+    }
+
+    /**
+     * The landscape rotation the 가로 고정 mode records in: the side the phone is lying on
+     * ([Surface.ROTATION_270] when that is what the sensor — or a landscape display — reports,
+     * else [Surface.ROTATION_90]). A portrait reading never changes the side, so lifting the
+     * phone out of its mount does not flip the footage upside down.
+     */
+    private fun landscapeRotation(): Int {
+        val observed = when {
+            sensorRotation == Surface.ROTATION_90 || sensorRotation == Surface.ROTATION_270 -> sensorRotation
+            isLandscape(displayRotation) -> displayRotation
+            else -> null
+        }
+        if (observed != null) landscapeSide = observed
+        return landscapeSide
+    }
+
+    /**
+     * Re-applies the 녹화 방향 setting after it was changed while recording: the running segment is
+     * split for the new orientation and the session is rebuilt, exactly like a real rotation. This
+     * is the one orientation change that also splits in 가로 고정 mode, because the user asked for it.
+     */
+    fun refreshOrientation() {
+        orientationChangeIsExplicit = true
+        try {
+            refreshOrientationNow()
+        } finally {
+            orientationChangeIsExplicit = false
         }
     }
 
@@ -325,6 +409,43 @@ class RecordingService : Service(), LifecycleOwner {
             // The immediate rebind in applyEffectiveRotation had to wait for a segment that was
             // still finalizing back then; catch up now that the capture is free.
             rebindForRotation()
+        }
+    }
+
+    // ------------------------------------------------------- display rotation
+
+    private val displayManager: DisplayManager?
+        get() = getSystemService(DisplayManager::class.java)
+
+    /**
+     * Follows `Display.rotation` even while the activity is gone.
+     *
+     * The screen used to report its rotation only through [setDisplayRotation] from the activity,
+     * so a rotation that happened in the background — the phone turned in its mount with
+     * auto-rotate on, or a navigation app that put the screen in landscape — was never seen and
+     * the footage stayed portrait until the app was opened again.
+     */
+    private fun registerDisplayTracking() {
+        runCatching {
+            displayManager?.registerDisplayListener(displayListener, mainHandler)
+        }.onFailure { Log.w(TAG, "Could not register the display listener", it) }
+    }
+
+    private fun unregisterDisplayTracking() {
+        runCatching { displayManager?.unregisterDisplayListener(displayListener) }
+            .onFailure { Log.w(TAG, "Could not unregister the display listener", it) }
+    }
+
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) = Unit
+
+        override fun onDisplayRemoved(displayId: Int) = Unit
+
+        override fun onDisplayChanged(displayId: Int) {
+            // Fires for any property of the display (brightness, refresh rate); only the
+            // rotation is interesting, and only of the screen the phone is using.
+            if (displayId != Display.DEFAULT_DISPLAY) return
+            updateDisplayRotation(currentDisplayRotation())
         }
     }
 
@@ -631,6 +752,14 @@ class RecordingService : Service(), LifecycleOwner {
 
     private fun updateNotification(text: String) {
         if (!inForeground) return
+        // Android 13+ shows no notification without the runtime permission. The foreground
+        // service keeps running anyway, so a missing grant is not treated as an error.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
         runCatching {
             NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, buildNotification(text))
         }
@@ -699,9 +828,11 @@ class RecordingService : Service(), LifecycleOwner {
 
         /**
          * How long a new orientation has to hold before the running segment is split for it.
-         * Absorbs the angles of turning the phone and tilting it back in one motion.
+         * Absorbs the angles of turning the phone and tilting it back in one motion, and lets a
+         * phone that is carried or briefly tilted while driving keep one continuous segment
+         * instead of being cut into 1-2 second fragments.
          */
-        private const val ORIENTATION_RESTART_DEBOUNCE_MS = 1_200L
+        private const val ORIENTATION_RESTART_DEBOUNCE_MS = 4_500L
 
         /**
          * Maps [OrientationEventListener] degrees to `Surface.ROTATION_*`.
@@ -732,6 +863,12 @@ class RecordingService : Service(), LifecycleOwner {
                 else -> Surface.ROTATION_90
             }
         }
+
+        private fun isLandscape(rotation: Int): Boolean =
+            rotation == Surface.ROTATION_90 || rotation == Surface.ROTATION_270
+
+        private fun isPortrait(rotation: Int): Boolean =
+            rotation == Surface.ROTATION_0 || rotation == Surface.ROTATION_180
 
         const val ACTION_START = "com.pickle.blackbox.action.START_RECORDING"
         const val ACTION_STOP = "com.pickle.blackbox.action.STOP_RECORDING"

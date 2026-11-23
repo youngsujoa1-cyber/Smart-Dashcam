@@ -1,6 +1,7 @@
 package com.pickle.blackbox.camera
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Handler
@@ -206,6 +207,7 @@ class RecordingController(
 
     // ------------------------------------------------------------- internals
 
+    @SuppressLint("MissingPermission") // hasAudioPermission() checks RECORD_AUDIO right above
     private fun startSegment(capture: VideoCapture<Recorder>) {
         val file = clipStorage.newSegmentFile()
         currentFile = file

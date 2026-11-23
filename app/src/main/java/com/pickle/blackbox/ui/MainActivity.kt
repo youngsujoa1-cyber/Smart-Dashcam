@@ -478,6 +478,11 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
         }
         dialogBinding.swAudio.isChecked = settings.recordAudio
         dialogBinding.swSpeed.isChecked = settings.showSpeed
+        if (settings.landscapeLocked) {
+            dialogBinding.rgOrientation.check(dialogBinding.rbOrientationLandscape.id)
+        } else {
+            dialogBinding.rgOrientation.check(dialogBinding.rbOrientationAuto.id)
+        }
 
         val languageOptions = AppLanguage.options(this)
         val languageTags = languageOptions.map { it.first }
@@ -510,6 +515,10 @@ class MainActivity : AppCompatActivity(), RecordingService.UiListener {
                 settings.storageLimitGb = limitGb
                 settings.recordAudio = dialogBinding.swAudio.isChecked
                 settings.showSpeed = dialogBinding.swSpeed.isChecked
+                settings.landscapeLocked =
+                    dialogBinding.rgOrientation.checkedRadioButtonId == R.id.rbOrientationLandscape
+                // A 녹화 방향 change takes effect right away, like a real rotation of the phone.
+                service?.refreshOrientation()
 
                 binding.tvSegment.text = getString(R.string.hud_segment_format, minutes)
                 updateStorageInfo()

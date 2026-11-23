@@ -53,6 +53,10 @@
     <string name="settings_segment_1min">1 分钟</string>
     <string name="settings_segment_3min">3 分钟</string>
     <string name="settings_segment_5min">5 分钟</string>
+    <string name="settings_orientation_title">录像方向</string>
+    <string name="settings_orientation_auto">自动（按设备方向）</string>
+    <string name="settings_orientation_landscape">固定横屏（16:9）</string>
+    <string name="settings_orientation_note">固定横屏：即使以竖屏开始录像，也始终保存为 16:9 横向。</string>
     <string name="settings_storage_title">存储容量上限（普通录像）</string>
     <string name="settings_storage_1gb">1GB</string>
     <string name="settings_storage_2gb">2GB</string>

@@ -60,6 +60,9 @@ class CameraController(
 
     /** Offscreen consumer that keeps the preview stream alive while no screen is attached. */
     private var dummyProvider: DummyPreviewSurface? = null
+
+    /** True while [dummyProvider] is the surface the bound [Preview] delivers to. */
+    private var dummyAttachedToPreview = false
     private var dummyReleaseRunnable: Runnable? = null
     private var targetRotation: Int = Surface.ROTATION_0
     private var started = false
@@ -109,9 +112,11 @@ class CameraController(
             val fallback = obtainDummyProvider()
             runCatching { preview?.surfaceProvider = fallback }
                 .onFailure { Log.w(TAG, "Could not attach the offscreen preview surface", it) }
+            dummyAttachedToPreview = preview != null
         } else {
             runCatching { preview?.surfaceProvider = provider }
                 .onFailure { Log.w(TAG, "Could not update the preview surface provider", it) }
+            dummyAttachedToPreview = false
             // Let the session consume the new surface first, then free the offscreen one.
             scheduleDummyRelease()
         }
@@ -182,6 +187,7 @@ class CameraController(
         preview = null
         videoCapture = null
         boundRotation = -1
+        dummyAttachedToPreview = false
     }
 
     private fun selectorFor(front: Boolean): CameraSelector =
@@ -205,7 +211,9 @@ class CameraController(
             .build()
         // Never leave Preview without a consumer: the UI surface when a screen is attached,
         // the offscreen surface otherwise.
+        val dummy = uiSurfaceProvider == null
         previewUseCase.surfaceProvider = uiSurfaceProvider ?: obtainDummyProvider()
+        dummyAttachedToPreview = dummy
 
         val qualitySelector = QualitySelector.from(
             Quality.FHD,
@@ -268,9 +276,10 @@ class CameraController(
         cancelDummyRelease()
         val provider = dummyProvider ?: return
         dummyProvider = null
-        if (preview?.surfaceProvider === provider) {
+        if (dummyAttachedToPreview) {
             // The use case is being torn down along with this surface; drop it first so a
             // later bind starts from a clean state.
+            dummyAttachedToPreview = false
             runCatching { preview?.surfaceProvider = uiSurfaceProvider }
         }
         provider.release()

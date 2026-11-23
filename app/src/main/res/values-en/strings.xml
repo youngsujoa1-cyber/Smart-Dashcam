@@ -53,6 +53,10 @@
     <string name="settings_segment_1min">1 min</string>
     <string name="settings_segment_3min">3 min</string>
     <string name="settings_segment_5min">5 min</string>
+    <string name="settings_orientation_title">Recording orientation</string>
+    <string name="settings_orientation_auto">Auto (device orientation)</string>
+    <string name="settings_orientation_landscape">Fixed landscape (16:9)</string>
+    <string name="settings_orientation_note">Fixed landscape: always saved as 16:9 landscape, even when the recording starts upright.</string>
     <string name="settings_storage_title">Storage limit (normal videos)</string>
     <string name="settings_storage_1gb">1GB</string>
     <string name="settings_storage_2gb">2GB</string>

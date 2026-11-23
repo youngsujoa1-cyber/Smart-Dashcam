@@ -53,6 +53,10 @@
     <string name="settings_segment_1min">1 min</string>
     <string name="settings_segment_3min">3 min</string>
     <string name="settings_segment_5min">5 min</string>
+    <string name="settings_orientation_title">Orientación de grabación</string>
+    <string name="settings_orientation_auto">Automático (según el dispositivo)</string>
+    <string name="settings_orientation_landscape">Horizontal fijo (16:9)</string>
+    <string name="settings_orientation_note">Horizontal fijo: siempre se guarda en 16:9 horizontal, aunque la grabación empiece en vertical.</string>
     <string name="settings_storage_title">Límite de almacenamiento (vídeos normales)</string>
     <string name="settings_storage_1gb">1 GB</string>
     <string name="settings_storage_2gb">2 GB</string>

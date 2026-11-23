@@ -55,6 +55,10 @@
     <string name="settings_segment_1min">1분</string>
     <string name="settings_segment_3min">3분</string>
     <string name="settings_segment_5min">5분</string>
+    <string name="settings_orientation_title">녹화 방향</string>
+    <string name="settings_orientation_auto">자동 (기기 방향)</string>
+    <string name="settings_orientation_landscape">가로 고정 (16:9)</string>
+    <string name="settings_orientation_note">가로 고정: 세로로 녹화를 시작해도 항상 16:9 가로로 저장합니다.</string>
     <string name="settings_storage_title">저장 용량 한도 (일반 영상)</string>
     <string name="settings_storage_1gb">1GB</string>
     <string name="settings_storage_2gb">2GB</string>

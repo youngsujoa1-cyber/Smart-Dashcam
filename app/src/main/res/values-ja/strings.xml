@@ -53,6 +53,10 @@
     <string name="settings_segment_1min">1分</string>
     <string name="settings_segment_3min">3分</string>
     <string name="settings_segment_5min">5分</string>
+    <string name="settings_orientation_title">録画の向き</string>
+    <string name="settings_orientation_auto">自動（端末の向き）</string>
+    <string name="settings_orientation_landscape">横向き固定（16:9）</string>
+    <string name="settings_orientation_note">横向き固定：縦向きで録画を始めても、常に 16:9 の横向きで保存します。</string>
     <string name="settings_storage_title">保存容量の上限（通常映像）</string>
     <string name="settings_storage_1gb">1GB</string>
     <string name="settings_storage_2gb">2GB</string>
